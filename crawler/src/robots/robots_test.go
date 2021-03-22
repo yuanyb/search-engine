@@ -1,7 +1,6 @@
 package robots
 
 import (
-	"src"
 	"strings"
 	"testing"
 )
@@ -31,7 +30,7 @@ Allow: /any`
 		{"/any", true},
 		{"/any/abc", true},
 	}
-	robot := main.NewRobots(strings.NewReader(robots_txt), "test_crawler")
+	robot := NewRobots(strings.NewReader(robots_txt), "test_crawler")
 	for _, testCase := range testCases {
 		if robot.Allow(testCase.path) != testCase.allow {
 			t.Error(testCase.path)
