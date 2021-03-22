@@ -18,6 +18,7 @@ func setHeader(req *http.Request) {
 
 }
 
+// 解压 gzip 响应
 func decompressGzip(r io.Reader) (io.ReadCloser, error) {
 	reader, err := gzip.NewReader(r)
 	if err != nil {
