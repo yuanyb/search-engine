@@ -41,8 +41,31 @@ func convertToUtf8(r io.Reader, contentType string) (string, error) {
 	return string(content), nil
 }
 
-func decodeDocument(resp *http.Response) (string, error) {
-	var err error
+func download(url string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	setHeader(req)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, errors.New("")
+	}
+	return resp, err
+}
+
+func DownloadText(url string) (string, error) {
+	resp, err := download(url)
+	if err != nil {
+		return "", err
+	}
+
 	var reader io.ReadCloser
 	// 如果返回的是 gzip 压缩过的数据的话
 	if resp.Header.Get("Content-Encoding") == "gzip" {
@@ -57,21 +80,14 @@ func decodeDocument(resp *http.Response) (string, error) {
 	return convertToUtf8(reader, resp.Header.Get("Content-Type"))
 }
 
-func Download(url string) (string, error) {
-	req, err := http.NewRequest("GET", url, nil)
+func DownloadBinary(url string) ([]byte, error) {
+	resp, err := download(url)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-
-	setHeader(req)
-
-	resp, err := http.DefaultClient.Do(req)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	if resp.StatusCode != 200 {
-		return "", errors.New("")
-	}
-
-	return decodeDocument(resp)
+	return data, nil
 }

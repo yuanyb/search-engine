@@ -7,7 +7,7 @@ import (
 
 // Strategy 表示爬虫的抓取 URL 的优先级策略
 type Scheduler interface {
-	Offer(group Group)
+	Offer(group UrlGroup)
 	Poll() string
 	addSeedUrls([]string)
 }
@@ -22,8 +22,8 @@ func (b *BFScheduler) Poll() string {
 	return url
 }
 
-func (b *BFScheduler) Offer(group Group) {
-	for _, url := range group.members {
+func (b *BFScheduler) Offer(group UrlGroup) {
+	for _, url := range group.Members {
 		b.queue.PushBack(url)
 	}
 }
@@ -79,10 +79,10 @@ type OPICScheduler struct {
 	cashMap map[string]float32
 }
 
-func (o *OPICScheduler) Offer(group Group) {
-	avg := o.cashMap[group.leader] / float32(len(group.members))
-	delete(o.cashMap, group.leader)
-	for _, member := range group.members {
+func (o *OPICScheduler) Offer(group UrlGroup) {
+	avg := o.cashMap[group.Leader] / float32(len(group.Members))
+	delete(o.cashMap, group.Leader)
+	for _, member := range group.Members {
 		if _, ok := o.cashMap[member]; !ok {
 			o.pq.Push(member)
 		}
@@ -92,7 +92,7 @@ func (o *OPICScheduler) Offer(group Group) {
 
 func (o *OPICScheduler) Poll() string {
 	url := o.pq.Pop().(string)
-	// Offer scheduler 对应的 Group 的时候再删除，因为还需要 scheduler 的 value
+	// Offer scheduler 对应的 UrlGroup 的时候再删除，因为还需要 scheduler 的 value
 	//delete(o.pq.cashMap, scheduler)
 	return url
 }

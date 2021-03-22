@@ -6,7 +6,7 @@ import (
 )
 
 func TestDownload(t *testing.T) {
-	text, err := Download("https://baidu.com")
+	text, err := DownloadText("https://baidu.com")
 	if err != nil {
 		t.Error(err)
 		return
