@@ -7,7 +7,15 @@ import (
 	"golang.org/x/net/html/charset"
 	"io"
 	"net/http"
+	"src/config"
 )
+
+type Downloader struct {
+	UserAgent string
+	// 一些配置信息...
+}
+
+var GlobalDownloader = Downloader{}
 
 // 设置 HTTP 请求的参数
 func setHeader(req *http.Request) {
@@ -49,18 +57,25 @@ func download(url string) (*http.Response, error) {
 
 	setHeader(req)
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
+	// 请求失败重试
+	retryCount := config.Get().RetryCount
+	var resp *http.Response
+	for i := 0; i < retryCount+1; i++ {
+		resp, err = http.DefaultClient.Do(req)
+		if err == nil {
+			break
+		}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return nil, errors.New("")
 	}
+
 	return resp, err
 }
 
-func DownloadText(url string) (string, error) {
+// 下载网页原始文本
+func (d *Downloader) DownloadText(url string) (string, error) {
 	resp, err := download(url)
 	if err != nil {
 		return "", err
@@ -80,7 +95,8 @@ func DownloadText(url string) (string, error) {
 	return convertToUtf8(reader, resp.Header.Get("Content-Type"))
 }
 
-func DownloadBinary(url string) ([]byte, error) {
+// 下载二进制文件
+func (d *Downloader) DownloadBinary(url string) ([]byte, error) {
 	resp, err := download(url)
 	if err != nil {
 		return nil, err

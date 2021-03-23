@@ -9,7 +9,7 @@ import (
 type Scheduler interface {
 	Offer(group UrlGroup)
 	Poll() string
-	addSeedUrls([]string)
+	AddSeedUrls([]string)
 }
 
 // Breath first
@@ -28,17 +28,16 @@ func (b *BFScheduler) Offer(group UrlGroup) {
 	}
 }
 
-func (b *BFScheduler) addSeedUrls(seedUrls []string) {
+func (b *BFScheduler) AddSeedUrls(seedUrls []string) {
 	for _, seedUrl := range seedUrls {
 		b.queue.PushBack(seedUrl)
 	}
 }
 
-func NewBFScheduler(seedUrls []string) Scheduler {
+func NewBFScheduler() Scheduler {
 	scheduler := &BFScheduler{
 		queue: list.New(),
 	}
-	scheduler.addSeedUrls(seedUrls)
 	return scheduler
 }
 
@@ -97,14 +96,14 @@ func (o *OPICScheduler) Poll() string {
 	return url
 }
 
-func (o *OPICScheduler) addSeedUrls(seedUrls []string) {
+func (o *OPICScheduler) AddSeedUrls(seedUrls []string) {
 	for _, seedUrl := range seedUrls {
 		o.cashMap[seedUrl] = 1.0
 		o.pq.Push(seedUrl)
 	}
 }
 
-func NewOPICScheduler(seedUrls []string) Scheduler {
+func NewOPICScheduler() Scheduler {
 	opic := &OPICScheduler{
 		cashMap: make(map[string]float32, 10000),
 		pq: priorityQueue{
@@ -112,7 +111,6 @@ func NewOPICScheduler(seedUrls []string) Scheduler {
 		},
 	}
 	opic.pq.opic = opic
-	opic.addSeedUrls(seedUrls)
 	heap.Init(&opic.pq)
 	return opic
 }

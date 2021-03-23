@@ -3,9 +3,14 @@ package robots
 
 import (
 	"bufio"
+	"fmt"
 	"io"
+	"net/url"
+	"src/downloader"
 	"strings"
 )
+
+var robotsMap = make(map[string]*robots, 10000)
 
 // 规则
 type rule struct {
@@ -49,8 +54,8 @@ func (r *rule) match(path string) bool {
 	return true
 }
 
-// Robots 表示 robots.txt 中和自己有关的规则
-type Robots struct {
+// robots 表示 robots.txt 中和自己有关的规则
+type robots struct {
 	allowRules    []*rule
 	disallowRules []*rule
 }
@@ -64,9 +69,9 @@ func splitLine(line string) (string, string, bool) {
 	return line[:pos], strings.TrimSpace(line[pos+1:]), true
 }
 
-// 创建一个 Robots
-func NewRobots(reader io.Reader, useragent string) *Robots {
-	robots := &Robots{}
+// 创建一个 robots
+func newRobots(reader io.Reader, useragent string) *robots {
+	robots := &robots{}
 	scanner := bufio.NewScanner(bufio.NewReader(reader))
 	// 当前行规则是否需要处理
 	needHandle := true
@@ -108,14 +113,32 @@ func NewRobots(reader io.Reader, useragent string) *Robots {
 }
 
 // 判断是否允许爬取 path
-func (r *Robots) Allow(path string) bool {
+func Allow(rawUrl, userAgent string) bool {
+	parsedUrl, err := url.Parse(rawUrl)
+	if err != nil {
+		// rawUrl 格式错误，就没必要访问了
+		return false
+	}
+	path := parsedUrl.Path + "?" + parsedUrl.RawQuery
+
+	// 从 robotsMap 中先获取 robots，如果没有则添加
+	if _, ok := robotsMap[parsedUrl.Host]; !ok {
+		robotsUrl := fmt.Sprintf("%s://%s/robots.txt", parsedUrl.Scheme, parsedUrl.Host)
+		robotsTxt, err := downloader.GlobalDownloader.DownloadText(robotsUrl)
+		if err != nil {
+			return true
+		}
+		robotsMap[parsedUrl.Host] = newRobots(strings.NewReader(robotsTxt), userAgent)
+	}
+	robots, _ := robotsMap[parsedUrl.Host]
+
 	// Allow 优先级更高
-	for _, rule := range r.allowRules {
+	for _, rule := range robots.allowRules {
 		if rule.match(path) {
 			return true
 		}
 	}
-	for _, rule := range r.disallowRules {
+	for _, rule := range robots.disallowRules {
 		if rule.match(path) {
 			return false
 		}
