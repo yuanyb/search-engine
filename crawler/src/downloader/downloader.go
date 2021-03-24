@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"src/config"
+	"time"
 )
 
 type Downloader struct {
@@ -59,6 +60,8 @@ func download(url string) (*http.Response, error) {
 
 	// 请求失败重试
 	retryCount := config.Get().RetryCount
+	timeout := config.Get().Timeout
+	http.DefaultClient.Timeout = time.Duration(timeout)
 	var resp *http.Response
 	for i := 0; i < retryCount+1; i++ {
 		resp, err = http.DefaultClient.Do(req)

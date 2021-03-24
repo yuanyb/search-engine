@@ -7,7 +7,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"io"
 	"os"
-	"strconv"
+	"src/util"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -19,6 +19,8 @@ type CrawlerConfig struct {
 	RandomInterval bool
 	// 时间间隔（ms）
 	Interval int64
+	// 超时时间（ms）
+	Timeout int64
 	// 暂停
 	Suspend bool
 	// 重试次数
@@ -32,21 +34,15 @@ type CrawlerConfig struct {
 func (c *CrawlerConfig) fill(name, value string) {
 	switch name {
 	case "random_interval": // bool
-		if b, err := strconv.ParseBool(value); err == nil {
-			c.RandomInterval = b
-		}
+		util.ToBool(&c.RandomInterval, value)
 	case "interval": // int64
-		if i, err := strconv.ParseInt(value, 10, 64); err == nil {
-			c.Interval = i
-		}
+		util.ToInt64(&c.Interval, value)
+	case "timeout":
+		util.ToInt64(&c.Timeout, value)
 	case "suspend": // bool
-		if b, err := strconv.ParseBool(value); err == nil {
-			c.Suspend = b
-		}
+		util.ToBool(&c.Suspend, value)
 	case "retry_count": // int
-		if i, err := strconv.ParseInt(value, 10, 64); err == nil {
-			c.RetryCount = int(i)
-		}
+		util.ToInt(&c.RetryCount, value)
 	case "useragent": // string
 		c.Useragent = value
 	case "log_level": // string
@@ -61,6 +57,7 @@ var (
 	// 本地配置项必须提供
 	localConfigItem = [...]string{"mysql.username", "mysql.password", "mysql.host",
 		"mysql.port", "mysql.dbname"}
+	LocalConfig   = loadLocalConfig()
 	defaultConfig = CrawlerConfig{
 		RandomInterval: false,
 		Interval:       500,
@@ -73,7 +70,7 @@ var (
 
 func init() {
 	var err error
-	lc := loadLocalConfig()
+	lc := LocalConfig
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", lc["mysql.username"], lc["mysql.password"],
 		lc["mysql.host"], lc["mysql.port"], lc["mysql.dbname"])
 

@@ -5,7 +5,7 @@ import (
 	"container/list"
 )
 
-// Strategy 表示爬虫的抓取 URL 的优先级策略
+// Scheduler 表示爬虫的抓取 URL 的调度策略
 type Scheduler interface {
 	Offer(group UrlGroup)
 	Poll() string
