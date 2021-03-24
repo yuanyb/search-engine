@@ -2,6 +2,13 @@
 package config
 
 import (
+	"database/sql"
+	"fmt"
+	_ "github.com/go-sql-driver/mysql"
+	"io"
+	"os"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -10,38 +17,148 @@ import (
 type CrawlerConfig struct {
 	// 随机时间间隔
 	RandomInterval bool
-	// 时间间隔
-	Interval time.Duration
+	// 时间间隔（ms）
+	Interval int64
 	// 暂停
 	Suspend bool
 	// 重试次数
 	RetryCount int
-	// UserAgent
-	UserAgent string
+	// Useragent
+	Useragent string
 	// 日志级别
 	LogLevel int
 }
 
-var dynamicConfig atomic.Value
+func (c *CrawlerConfig) fill(name, value string) {
+	switch name {
+	case "random_interval": // bool
+		if b, err := strconv.ParseBool(value); err == nil {
+			c.RandomInterval = b
+		}
+	case "interval": // int64
+		if i, err := strconv.ParseInt(value, 10, 64); err == nil {
+			c.Interval = i
+		}
+	case "suspend": // bool
+		if b, err := strconv.ParseBool(value); err == nil {
+			c.Suspend = b
+		}
+	case "retry_count": // int
+		if i, err := strconv.ParseInt(value, 10, 64); err == nil {
+			c.RetryCount = int(i)
+		}
+	case "useragent": // string
+		c.Useragent = value
+	case "log_level": // string
+		// todo log level
+	}
+}
+
+// todo 通过配置文件
+const dsn = "root:root@tcp(localhost:3306)/search-engine-crawler?charset=utf8"
+
+var (
+	dynamicConfig atomic.Value
+	db            *sql.DB
+	stmt          *sql.Stmt
+	// 本地配置项必须提供
+	localConfigItem = [...]string{"mysql.username", "mysql.password", "mysql.host",
+		"mysql.port", "mysql.dbname"}
+	defaultConfig = CrawlerConfig{
+		RandomInterval: false,
+		Interval:       500,
+		Suspend:        false,
+		RetryCount:     3,
+		Useragent:      "qut_spider",
+		LogLevel:       0,
+	}
+)
 
 func init() {
+	var err error
+	lc := loadLocalConfig()
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", lc["mysql.username"], lc["mysql.password"],
+		lc["mysql.host"], lc["mysql.port"], lc["mysql.dbname"])
+
+	if db, err = sql.Open("mysql", dsn); err != nil {
+		panic(err)
+	}
+	if err = db.Ping(); err != nil {
+		panic(err)
+	}
+	if stmt, err = db.Prepare("select `name`, `value` from `config`"); err != nil {
+		panic(err)
+	}
+
+	initDone := make(chan struct{})
 	go func() {
+		initialized := false
 		for {
-			// todo get config from redis
-			newConfig := &CrawlerConfig{
-				RandomInterval: false,
-				Interval:       time.Second,
-				Suspend:        false,
-				RetryCount:     3,
-				UserAgent:      "qut_spider",
-				LogLevel:       0,
+			latestConfig := loadLatestConfig()
+			dynamicConfig.Store(latestConfig)
+			if !initialized {
+				initialized = true
+				initDone <- struct{}{}
 			}
-			dynamicConfig.Store(newConfig)
 			time.Sleep(time.Second)
 		}
 	}()
+	<-initDone
+	close(initDone)
 }
 
-func Get() CrawlerConfig {
-	return dynamicConfig.Load().(CrawlerConfig)
+func loadLocalConfig() map[string]string {
+	file, err := os.Open("./crawler.properties")
+	if err != nil {
+		pwd, _ := os.Getwd()
+		panic(fmt.Sprintf("缺少配置文件 %s/crawler.properties", pwd))
+	}
+
+	b, err := io.ReadAll(file)
+	if err != nil {
+		pwd, _ := os.Getwd()
+		panic(fmt.Sprintf("读取配置文件 %s/crawler.properties 失败", pwd))
+	}
+
+	config := make(map[string]string)
+	for _, line := range strings.Split(string(b), "\n") {
+		item := strings.SplitN(line, "=", 2)
+		if len(item) != 2 {
+			panic(fmt.Sprintf("配置项[%s]格式错误", line))
+		}
+		config[strings.TrimSpace(item[0])] = strings.TrimSpace(item[1])
+	}
+	checkLocalConfigItem(config)
+	return config
+}
+
+func checkLocalConfigItem(config map[string]string) {
+	for _, name := range localConfigItem {
+		if _, ok := config[name]; !ok {
+			panic(fmt.Sprintf("缺少配置项[%s]", name))
+		}
+	}
+}
+
+func loadLatestConfig() *CrawlerConfig {
+	// 拷贝一份默认配置
+	latestConfig := defaultConfig
+
+	rows, err := stmt.Query()
+	if err != nil {
+		return &latestConfig
+	}
+
+	for rows.Next() {
+		var name, value string
+		if err = rows.Scan(&name, &value); err != nil {
+			return &latestConfig
+		}
+		latestConfig.fill(name, value)
+	}
+	return &latestConfig
+}
+
+func Get() *CrawlerConfig {
+	return dynamicConfig.Load().(*CrawlerConfig)
 }

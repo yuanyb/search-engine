@@ -19,7 +19,7 @@ var GlobalDownloader = Downloader{}
 
 // 设置 HTTP 请求的参数
 func setHeader(req *http.Request) {
-	// 爬虫 UserAgent
+	// 爬虫 Useragent
 	req.Header.Set("User-Agent", "QutSpider")
 	// 支持 gzip 压缩传输
 	req.Header.Set("Accept-Encoding", "gzip")

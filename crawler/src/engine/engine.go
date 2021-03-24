@@ -65,7 +65,7 @@ func (e *CrawlerEngine) filterUrl(urls []string) []string {
 
 	for _, url := range urls {
 		// robots
-		if !robots.Allow(url, config.Get().UserAgent) {
+		if !robots.Allow(url, config.Get().Useragent) {
 			continue
 		}
 
@@ -86,9 +86,9 @@ func (e *CrawlerEngine) filterUrl(urls []string) []string {
 func (e *CrawlerEngine) crawlerWait() {
 	conf := config.Get()
 	if conf.RandomInterval {
-		time.Sleep(time.Duration(rand.Int63n(int64(conf.Interval))))
+		time.Sleep(time.Millisecond * time.Duration(rand.Int63n(conf.Interval)))
 	} else {
-		time.Sleep(conf.Interval)
+		time.Sleep(time.Millisecond * time.Duration(conf.Interval))
 	}
 }
 
