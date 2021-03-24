@@ -84,6 +84,7 @@ func (o *OPICScheduler) Offer(group UrlGroup) {
 	for _, member := range group.Members {
 		if _, ok := o.cashMap[member]; !ok {
 			o.pq.Push(member)
+			o.cashMap[member] = 1.0
 		}
 		o.cashMap[member] += avg
 	}
