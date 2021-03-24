@@ -54,9 +54,6 @@ func (c *CrawlerConfig) fill(name, value string) {
 	}
 }
 
-// todo 通过配置文件
-const dsn = "root:root@tcp(localhost:3306)/search-engine-crawler?charset=utf8"
-
 var (
 	dynamicConfig atomic.Value
 	db            *sql.DB

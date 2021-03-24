@@ -112,8 +112,22 @@ func newRobots(reader io.Reader, useragent string) *robots {
 	return robots
 }
 
+func getRobot(parsedUrl *url.URL, useragent string) *robots {
+	// 从 robotsMap 中先获取 robots，如果没有则添加
+	if _, ok := robotsMap[parsedUrl.Host]; !ok {
+		robotsUrl := fmt.Sprintf("%s://%s/robots.txt", parsedUrl.Scheme, parsedUrl.Host)
+		robotsTxt, err := downloader.GlobalDownloader.DownloadText(robotsUrl)
+		if err != nil {
+			return nil
+		}
+		robotsMap[parsedUrl.Host] = newRobots(strings.NewReader(robotsTxt), useragent)
+	}
+
+	return robotsMap[parsedUrl.Host]
+}
+
 // 判断是否允许爬取 path
-func Allow(rawUrl, userAgent string) bool {
+func Allow(rawUrl, useragent string) bool {
 	parsedUrl, err := url.Parse(rawUrl)
 	if err != nil {
 		// rawUrl 格式错误，就没必要访问了
@@ -121,24 +135,17 @@ func Allow(rawUrl, userAgent string) bool {
 	}
 	path := parsedUrl.Path + "?" + parsedUrl.RawQuery
 
-	// 从 robotsMap 中先获取 robots，如果没有则添加
-	if _, ok := robotsMap[parsedUrl.Host]; !ok {
-		robotsUrl := fmt.Sprintf("%s://%s/robots.txt", parsedUrl.Scheme, parsedUrl.Host)
-		robotsTxt, err := downloader.GlobalDownloader.DownloadText(robotsUrl)
-		if err != nil {
-			return true
-		}
-		robotsMap[parsedUrl.Host] = newRobots(strings.NewReader(robotsTxt), userAgent)
+	robot := getRobot(parsedUrl, useragent)
+	if robot == nil {
+		return true
 	}
-	robots, _ := robotsMap[parsedUrl.Host]
-
 	// Allow 优先级更高
-	for _, rule := range robots.allowRules {
+	for _, rule := range robot.allowRules {
 		if rule.match(path) {
 			return true
 		}
 	}
-	for _, rule := range robots.disallowRules {
+	for _, rule := range robot.disallowRules {
 		if rule.match(path) {
 			return false
 		}
