@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"src/downloader"
+	"search-engine/crawler/downloader"
 	"strings"
 )
 

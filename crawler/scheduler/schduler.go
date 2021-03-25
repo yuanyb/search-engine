@@ -3,8 +3,8 @@ package scheduler
 import (
 	"container/heap"
 	"container/list"
-	"src/config"
-	"src/robots"
+	"search-engine/crawler/config"
+	"search-engine/crawler/robots"
 )
 
 // Scheduler 表示爬虫的抓取 URL 的调度策略

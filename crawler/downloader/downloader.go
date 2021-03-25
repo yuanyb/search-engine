@@ -7,7 +7,7 @@ import (
 	"golang.org/x/net/html/charset"
 	"io"
 	"net/http"
-	"src/config"
+	"search-engine/crawler/config"
 	"strconv"
 	"strings"
 	"time"

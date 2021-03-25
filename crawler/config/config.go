@@ -7,7 +7,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"io"
 	"os"
-	"src/util"
+	"search-engine/crawler/util"
 	"strings"
 	"sync/atomic"
 	"time"

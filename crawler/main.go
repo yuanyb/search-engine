@@ -1,8 +1,8 @@
 package main
 
 import (
-	"src/engine"
-	"src/scheduler"
+	"search-engine/crawler/engine"
+	"search-engine/crawler/scheduler"
 )
 
 func main() {

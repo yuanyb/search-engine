@@ -2,12 +2,12 @@ package engine
 
 import (
 	"math/rand"
-	"src/config"
-	"src/data"
-	"src/downloader"
-	"src/robots"
-	"src/scheduler"
-	"src/util"
+	"search-engine/crawler/config"
+	"search-engine/crawler/data"
+	"search-engine/crawler/downloader"
+	"search-engine/crawler/robots"
+	"search-engine/crawler/scheduler"
+	"search-engine/crawler/util"
 	"time"
 )
 
