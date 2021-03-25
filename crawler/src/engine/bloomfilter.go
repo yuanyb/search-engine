@@ -1,6 +1,8 @@
 // 布隆过滤器，用于记录已经抓取过的网页
 package engine
 
+import "src/util"
+
 const hashFuncCount = 5
 
 // 计算哈希的种子值
@@ -18,10 +20,7 @@ func init() {
 			for _, ch := range url {
 				h = h*seed + int(ch)
 			}
-			if h < 0 {
-				h = -h
-			}
-			return h
+			return util.AbsInt(h)
 		}
 	}
 }

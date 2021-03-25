@@ -117,7 +117,9 @@ func getRobot(parsedUrl *url.URL, useragent string) *robots {
 	if _, ok := robotsMap[parsedUrl.Host]; !ok {
 		robotsUrl := fmt.Sprintf("%s://%s/robots.txt", parsedUrl.Scheme, parsedUrl.Host)
 		robotsTxt, err := downloader.GlobalDownloader.DownloadText(robotsUrl)
+		// 如果 robots.txt 不存在，则在 robotsMap 保存 nil 即可
 		if err != nil {
+			robotsMap[parsedUrl.Host] = nil
 			return nil
 		}
 		robotsMap[parsedUrl.Host] = newRobots(strings.NewReader(robotsTxt), useragent)

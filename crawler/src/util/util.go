@@ -1,6 +1,9 @@
 package util
 
-import "strconv"
+import (
+	"strconv"
+	"time"
+)
 
 // 解析失败，则不设置值，因此使用指针的方式修改，如果返回值的话，使用起来就比较繁琐了
 func ToBool(dest *bool, value string) {
@@ -19,4 +22,15 @@ func ToInt64(dest *int64, value string) {
 	if i, err := strconv.ParseInt(value, 10, 64); err == nil {
 		*dest = i
 	}
+}
+
+func AbsInt(i int) int {
+	if i < 0 {
+		return -i
+	}
+	return i
+}
+
+func Today() string {
+	return time.Now().Format("2006-01-02")
 }

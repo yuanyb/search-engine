@@ -1,4 +1,4 @@
-// 实时读取配置信息，并作用于爬虫系统，用于后台可以实时手动调节爬虫参数
+// 全局配置，实时读取配置信息，并作用于爬虫系统，用于后台可以实时手动调节爬虫参数
 package config
 
 import (
@@ -11,6 +11,27 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+)
+
+var (
+	dynamicConfig atomic.Value
+	db            *sql.DB
+	stmt          *sql.Stmt
+
+	// 本地配置项必须提供
+	localConfigItem = [...]string{"mysql.username", "mysql.password", "mysql.host",
+		"mysql.port", "mysql.dbname"}
+
+	LocalConfig   = loadLocalConfig()
+	defaultConfig = CrawlerConfig{
+		RandomInterval: false,
+		Interval:       2000,
+		Suspend:        false,
+		Timeout:        3000,
+		RetryCount:     3,
+		Useragent:      "qut_spider",
+		LogLevel:       util.LDebug,
+	}
 )
 
 // 爬虫启动参数，做全局变量使用
@@ -46,29 +67,12 @@ func (c *CrawlerConfig) fill(name, value string) {
 	case "useragent": // string
 		c.Useragent = value
 	case "log_level": // string
-		// todo log level
+		util.ToInt(&c.LogLevel, value)
 	}
 }
 
-var (
-	dynamicConfig atomic.Value
-	db            *sql.DB
-	stmt          *sql.Stmt
-	// 本地配置项必须提供
-	localConfigItem = [...]string{"mysql.username", "mysql.password", "mysql.host",
-		"mysql.port", "mysql.dbname"}
-	LocalConfig   = loadLocalConfig()
-	defaultConfig = CrawlerConfig{
-		RandomInterval: false,
-		Interval:       500,
-		Suspend:        false,
-		RetryCount:     3,
-		Useragent:      "qut_spider",
-		LogLevel:       0,
-	}
-)
-
 func init() {
+	// 初始化数据库
 	var err error
 	lc := LocalConfig
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", lc["mysql.username"], lc["mysql.password"],
@@ -84,11 +88,14 @@ func init() {
 		panic(err)
 	}
 
+	// 初始化配置更新协程
 	initDone := make(chan struct{})
 	go func() {
 		initialized := false
 		for {
 			latestConfig := loadLatestConfig()
+			// 更新日志级别
+			util.Logger.SetLevel(latestConfig.LogLevel)
 			dynamicConfig.Store(latestConfig)
 			if !initialized {
 				initialized = true
@@ -116,6 +123,10 @@ func loadLocalConfig() map[string]string {
 
 	config := make(map[string]string)
 	for _, line := range strings.Split(string(b), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || line[0] == '#' {
+			continue // 忽略注释、空行
+		}
 		item := strings.SplitN(line, "=", 2)
 		if len(item) != 2 {
 			panic(fmt.Sprintf("配置项[%s]格式错误", line))

@@ -3,12 +3,15 @@ package scheduler
 import (
 	"container/heap"
 	"container/list"
+	"src/config"
+	"src/robots"
 )
 
 // Scheduler 表示爬虫的抓取 URL 的调度策略
 type Scheduler interface {
 	Offer(group UrlGroup)
 	Poll() string
+	Empty() bool
 	AddSeedUrls([]string)
 }
 
@@ -18,7 +21,9 @@ type BFScheduler struct {
 }
 
 func (b *BFScheduler) Poll() string {
-	url := b.queue.Remove(b.queue.Front()).(string)
+	println("===len:", b.queue.Len())
+	e := b.queue.Front()
+	url := b.queue.Remove(e).(string)
 	return url
 }
 
@@ -28,9 +33,16 @@ func (b *BFScheduler) Offer(group UrlGroup) {
 	}
 }
 
+func (b *BFScheduler) Empty() bool {
+	return b.queue.Len() == 0
+}
+
 func (b *BFScheduler) AddSeedUrls(seedUrls []string) {
 	for _, seedUrl := range seedUrls {
-		b.queue.PushBack(seedUrl)
+		// 初始化种子 url 的 robots.txt
+		if robots.Allow(seedUrl, config.Get().Useragent) {
+			b.queue.PushBack(seedUrl)
+		}
 	}
 }
 
@@ -95,6 +107,10 @@ func (o *OPICScheduler) Poll() string {
 	// Offer scheduler 对应的 UrlGroup 的时候再删除，因为还需要 scheduler 的 value
 	//delete(o.pq.cashMap, scheduler)
 	return url
+}
+
+func (o *OPICScheduler) Empty() bool {
+	return o.pq.Len() == 0
 }
 
 func (o *OPICScheduler) AddSeedUrls(seedUrls []string) {
