@@ -1,7 +1,9 @@
 // 布隆过滤器，用于记录已经抓取过的网页
 package engine
 
-import "search-engine/crawler/util"
+import (
+	"search-engine/crawler/util"
+)
 
 const hashFuncCount = 5
 

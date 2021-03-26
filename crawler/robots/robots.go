@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"search-engine/crawler/downloader"
 	"strings"
+	"sync"
 )
 
 var robotsMap = make(map[string]*robots, 10000)
@@ -112,11 +113,17 @@ func newRobots(reader io.Reader, useragent string) *robots {
 	return robots
 }
 
+var mutex sync.Mutex
+
+// 保证并发安全
 func getRobot(parsedUrl *url.URL, useragent string) *robots {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	// 从 robotsMap 中先获取 robots，如果没有则添加
 	if _, ok := robotsMap[parsedUrl.Host]; !ok {
 		robotsUrl := fmt.Sprintf("%s://%s/robots.txt", parsedUrl.Scheme, parsedUrl.Host)
-		robotsTxt, err := downloader.GlobalDownloader.DownloadText(robotsUrl)
+		robotsTxt, err := downloader.GlobalDl.DownloadText(robotsUrl)
 		// 如果 robots.txt 不存在，则在 robotsMap 保存 nil 即可
 		if err != nil {
 			robotsMap[parsedUrl.Host] = nil
@@ -130,6 +137,7 @@ func getRobot(parsedUrl *url.URL, useragent string) *robots {
 
 // 判断是否允许爬取 path
 func Allow(rawUrl, useragent string) bool {
+	return true
 	parsedUrl, err := url.Parse(rawUrl)
 	if err != nil {
 		// rawUrl 格式错误，就没必要访问了

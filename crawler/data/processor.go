@@ -14,23 +14,23 @@ func ExtractUrls(rootUrl, document string) []string {
 	result := urlPattern.FindAllStringSubmatch(document, -1)
 	urls := make([]string, 0, len(result))
 	for _, res := range result {
-		url := res[1]
-		if !strings.HasPrefix(url, "http") && !strings.HasPrefix(url, "HTTP") {
-			url = fmt.Sprintf("%s/%s", rootUrl, url)
-			url = trimFragment(url)
+		u := res[1]
+		u = trimFragment(u)
+		if !isValuableUrl(u) {
+			continue
 		}
-		if isValuableUrl(url) {
-			urls = append(urls, url)
+		if !strings.HasPrefix(u, "http") && !strings.HasPrefix(u, "HTTP") {
+			u = fmt.Sprintf("%s/%s", rootUrl, u)
 		}
+		urls = append(urls, u)
 	}
 	return urls
 }
 
-func isValuableUrl(url string) bool {
-	if strings.HasPrefix(url, "javascript:") { // <a href="javascirpt:xxx">...
+func isValuableUrl(u string) bool {
+	if strings.HasPrefix(u, "javascript:") { // <a href="javascirpt:xxx">...
 		return false
 	}
-	// ...
 	return true
 }
 

@@ -1,6 +1,7 @@
 package util
 
 import (
+	"math/rand"
 	"strconv"
 	"time"
 )
@@ -33,4 +34,18 @@ func AbsInt(i int) int {
 
 func Today() string {
 	return time.Now().Format("2006-01-02")
+}
+
+func HashByteSlice(bytes []byte) int {
+	h := 0
+	for _, b := range bytes {
+		h = h*31 + int(b)
+	}
+	return AbsInt(h)
+}
+
+func ShuffleStringSlice(slice []string) {
+	rand.Shuffle(len(slice), func(i, j int) {
+		slice[i], slice[j] = slice[j], slice[i]
+	})
 }

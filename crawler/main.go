@@ -1,6 +1,7 @@
 package main
 
 import (
+	"search-engine/crawler/downloader"
 	"search-engine/crawler/engine"
 	"search-engine/crawler/scheduler"
 )
@@ -8,8 +9,8 @@ import (
 func main() {
 	engine.NewCrawlerEngine(
 		scheduler.NewBFScheduler(),
-		1,
-		[]string{"https://fuliba2020.net/"},
+		downloader.GlobalDl,
+		10,
+		[]string{"https://sina.com.cn"},
 	).Run()
-	// todo  删除 url后的 #xxx
 }

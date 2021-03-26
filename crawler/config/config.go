@@ -25,9 +25,9 @@ var (
 	LocalConfig   = loadLocalConfig()
 	defaultConfig = CrawlerConfig{
 		RandomInterval: false,
-		Interval:       2000,
+		Interval:       3000,
 		Suspend:        false,
-		Timeout:        3000,
+		Timeout:        10000,
 		RetryCount:     3,
 		Useragent:      "qut_spider",
 		LogLevel:       util.LDebug,
@@ -75,8 +75,8 @@ func init() {
 	// 初始化数据库
 	var err error
 	lc := LocalConfig
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", lc["mysql.username"], lc["mysql.password"],
-		lc["mysql.host"], lc["mysql.port"], lc["mysql.dbname"])
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", lc["mysql.username"],
+		lc["mysql.password"], lc["mysql.host"], lc["mysql.port"], lc["mysql.dbname"])
 
 	if db, err = sql.Open("mysql", dsn); err != nil {
 		panic(err)

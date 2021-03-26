@@ -18,7 +18,7 @@ type Downloader struct {
 	// 一些配置信息...
 }
 
-var GlobalDownloader = Downloader{}
+var GlobalDl = Downloader{}
 
 // 设置 HTTP 请求的参数
 func setHeader(req *http.Request) {

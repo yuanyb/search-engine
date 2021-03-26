@@ -11,6 +11,7 @@ import (
 type Scheduler interface {
 	Offer(group UrlGroup)
 	Poll() string
+	Front() string
 	Empty() bool
 	AddSeedUrls([]string)
 }
@@ -21,7 +22,6 @@ type BFScheduler struct {
 }
 
 func (b *BFScheduler) Poll() string {
-	println("===len:", b.queue.Len())
 	e := b.queue.Front()
 	url := b.queue.Remove(e).(string)
 	return url
@@ -31,6 +31,10 @@ func (b *BFScheduler) Offer(group UrlGroup) {
 	for _, url := range group.Members {
 		b.queue.PushBack(url)
 	}
+}
+
+func (b *BFScheduler) Front() string {
+	return b.queue.Front().Value.(string)
 }
 
 func (b *BFScheduler) Empty() bool {
@@ -86,7 +90,8 @@ func (p *priorityQueue) Pop() interface{} {
 // 规定每个链接初始 cash 值为 1
 type OPICScheduler struct {
 	pq priorityQueue
-	// 保存 scheduler 对应的 cash，为了节省内存，下载完某个 URL 对应的页面后，要删除 cashMap 中的 k、v
+	// 保存 scheduler 对应的 cash，为了节省内存，
+	// 下载完某个 URL 对应的页面后，要删除 cashMap 中的 k、v
 	cashMap map[string]float32
 }
 
@@ -107,6 +112,10 @@ func (o *OPICScheduler) Poll() string {
 	// Offer scheduler 对应的 UrlGroup 的时候再删除，因为还需要 scheduler 的 value
 	//delete(o.pq.cashMap, scheduler)
 	return url
+}
+
+func (o *OPICScheduler) Front() string {
+	return o.pq.array[0]
 }
 
 func (o *OPICScheduler) Empty() bool {
