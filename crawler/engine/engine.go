@@ -44,7 +44,6 @@ func (e *CrawlerEngine) startCrawlerGoroutine() {
 
 				// 获取下一个 URL 并下载
 				u := <-e.urlChan[num]
-
 				document, err := e.downloader.DownloadText(u)
 				if err != nil {
 					continue
@@ -55,6 +54,7 @@ func (e *CrawlerEngine) startCrawlerGoroutine() {
 				// 从网页中提取出 URL、过滤，然后交给调度器
 				urls := data.ExtractUrls(u, document)
 				urls = e.filterUrl(urls)
+				// 打散 url 列表，使各个 crawler goroutine 更加均衡
 				util.ShuffleStringSlice(urls)
 				e.urlGroupChan <- scheduler.UrlGroup{Leader: u, Members: urls}
 				e.crawlerWait()
@@ -94,9 +94,9 @@ func (e *CrawlerEngine) filterUrl(urls []string) []string {
 func (e *CrawlerEngine) crawlerWait() {
 	conf := config.Get()
 	if conf.RandomInterval {
-		time.Sleep(time.Millisecond * time.Duration(rand.Int63n(conf.Interval)))
+		time.Sleep(util.Int64ToMillisecond(rand.Int63n(conf.Interval) + 2))
 	} else {
-		time.Sleep(time.Millisecond * time.Duration(conf.Interval))
+		time.Sleep(util.Int64ToMillisecond(conf.Interval))
 	}
 }
 
@@ -125,7 +125,7 @@ func (e *CrawlerEngine) startSchedulerGoroutine() {
 			urlChanFull := false
 			for !urlChanFull {
 				if e.scheduler.Empty() {
-					time.Sleep(time.Millisecond * time.Duration(config.Get().Interval))
+					time.Sleep(util.Int64ToMillisecond(config.Get().Timeout * 2))
 					break
 				}
 				u := e.scheduler.Front()
@@ -133,7 +133,7 @@ func (e *CrawlerEngine) startSchedulerGoroutine() {
 				select {
 				case e.urlChan[to] <- u:
 					e.scheduler.Poll()
-				case <-time.After(time.Second * 5):
+				case <-time.After(util.Int64ToMillisecond(config.Get().Timeout * 2)):
 					urlChanFull = true
 				}
 			}
@@ -164,20 +164,20 @@ func (e *CrawlerEngine) getHostIpHash(rawUrl string) int {
 	if h, ok := ipHashMap[parsedUrl.Host]; ok {
 		return h
 	}
-	ip, err := net.LookupIP(parsedUrl.Host)
-	if err != nil {
-		retryCount := config.Get().RetryCount
-		for i := 0; i < retryCount; i++ {
-			if ip, err = net.LookupIP(parsedUrl.Host); err != nil {
-				continue
-			}
-			break
+
+	var ip []net.IP
+	retryCount := config.Get().RetryCount
+	for i := 0; i < retryCount+1; i++ {
+		if ip, err = net.LookupIP(parsedUrl.Host); err != nil {
+			continue
 		}
+		break
 	}
 	// 如果重试后还是无法获取 ip
-	if err != nil {
+	if err != nil || len(ip) == 0 {
 		return rand.Intn(e.goroutineCount)
 	}
+
 	h := util.HashByteSlice(ip[0])
 	ipHashMap[parsedUrl.Host] = h
 	return h
@@ -204,7 +204,7 @@ func NewCrawlerEngine(sch scheduler.Scheduler, dl downloader.Downloader, goCount
 		goroutineCount: goCount,
 		seedUrls:       seedUrls,
 		urlChan:        chanList,
-		urlGroupChan:   make(chan scheduler.UrlGroup, goCount*10),
+		urlGroupChan:   make(chan scheduler.UrlGroup, goCount*100),
 	}
 	return engine
 }

@@ -49,3 +49,7 @@ func ShuffleStringSlice(slice []string) {
 		slice[i], slice[j] = slice[j], slice[i]
 	})
 }
+
+func Int64ToMillisecond(n int64) time.Duration {
+	return time.Duration(n) * time.Millisecond
+}
