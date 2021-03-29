@@ -10,7 +10,7 @@ func main() {
 	engine.NewCrawlerEngine(
 		scheduler.NewBFScheduler(),
 		downloader.GlobalDl,
-		10,
-		[]string{"https://sina.com.cn"},
+		100,
+		[]string{"http://www.qut.edu.cn"},
 	).Run()
 }

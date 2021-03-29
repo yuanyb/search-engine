@@ -40,3 +40,8 @@ func trimFragment(url string) string {
 	}
 	return url
 }
+
+// 抽取网页中的文本信息
+func ExtractText(document string) string {
+	return ""
+}
