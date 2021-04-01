@@ -1,7 +1,10 @@
 // 索引
 package core
 
-import "search-engine/index/db"
+import (
+	"encoding/binary"
+	"search-engine/index/db"
+)
 
 // 索引管理器
 type indexManager struct {
@@ -11,7 +14,7 @@ type indexManager struct {
 	db                   *db.DB
 }
 
-// 倒排索引
+// 倒排索引 tokenId->tokenIndexItem
 type invertedIndex map[int]*tokenIndexItem
 
 // token 对应的索引项
@@ -25,7 +28,7 @@ type tokenIndexItem struct {
 // 倒排列表
 type postingsList struct {
 	documentId int           // 文档编号
-	positions  []int         // 词元在该文档中的位置信息，如果在标题中出现了，则positions[0]表示在标题中出现的位置
+	positions  []int         // 词元在该文档中的位置信息
 	next       *postingsList // 指向下一个倒排列表的指针
 	flag       uint8         // todo 0000_0000 0号位表示在正文中出现，1号位表示在标题中出现
 }
@@ -85,7 +88,7 @@ func (i invertedIndex) merge(index invertedIndex) {
 		if ok {
 			baseItem.documentCount++
 			baseItem.positionsCount += item.positionsCount
-			baseItem.postings.merge(item.postings)
+			baseItem.postings = baseItem.postings.merge(item.postings)
 		} else {
 			i[tokenId] = item
 		}
@@ -93,7 +96,7 @@ func (i invertedIndex) merge(index invertedIndex) {
 }
 
 // 合并倒排列表，文档ID小的列表项在前
-func (p *postingsList) merge(postings *postingsList) {
+func (p *postingsList) merge(postings *postingsList) *postingsList {
 	head := new(postingsList)
 	pc, pa, pb := head, p, postings
 	for pa != nil || pb != nil {
@@ -107,19 +110,46 @@ func (p *postingsList) merge(postings *postingsList) {
 		pc = pc.next
 		pc.next = nil
 	}
-	*p = *(head.next)
+	return head.next
 }
 
 // 将倒排列表编码成二进制数据
 func (p *postingsList) encode() []byte {
-	// todo
-	return nil
+	size := 0
+	for p2 := p; p2 != nil; p2 = p2.next {
+		size += 4 + 4 + 4*len(p2.positions)
+	}
+	buf := make([]byte, size)
+	for pos := 0; p != nil; p = p.next {
+		binary.BigEndian.PutUint32(buf[pos:], uint32(p.documentId))
+		pos += 4
+		binary.BigEndian.PutUint32(buf[pos:], uint32(len(p.positions)))
+		pos += 4
+		for _, v := range p.positions {
+			binary.BigEndian.PutUint32(buf[pos:], uint32(v))
+			pos += 4
+		}
+	}
+	return buf
 }
 
 // 将二进制数据解码成倒排列表
-
 func decodePostingsList(data []byte) *postingsList {
-	return nil
+	head := new(postingsList)
+	p := head
+	for pos := 0; pos < len(data); {
+		p.next = new(postingsList)
+		p = p.next
+		p.documentId = int(binary.BigEndian.Uint32(data[pos:]))
+		pos += 4
+		length := int(binary.BigEndian.Uint32(data[pos:]))
+		pos += 4
+		for i := 0; i < length; i++ {
+			p.positions = append(p.positions, int(binary.BigEndian.Uint32(data[pos:])))
+			pos += 4
+		}
+	}
+	return head.next
 }
 
 // 将 index 合并进索引管理器
@@ -129,7 +159,7 @@ func (m *indexManager) merge(index invertedIndex) {
 		return
 	}
 	m.indexBuffer.merge(index)
-
+	// 缓存数量大于阈值，刷新到存储器
 	if m.bufferCount > m.bufferFlushThreshold {
 		m.flush()
 	}
@@ -146,7 +176,7 @@ func (m *indexManager) flush() {
 		}
 		postings := decodePostingsList(data)
 		// 内存中合并
-		postings.merge(item.postings)
+		postings = postings.merge(item.postings)
 		// 写回
 		data = postings.encode()
 		err = m.db.UpdatePostingsList(tokenId, data)

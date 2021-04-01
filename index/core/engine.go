@@ -16,6 +16,7 @@ func NewEngine() *Engine {
 
 func (e *Engine) AddDocument(document string) {
 	title, body := "", "" // parseDocument(document)
+	_ = title
 	docId := 0
 	index := e.textProcessor.textToInvertedIndex(docId, body)
 	e.indexManager.merge(index)
