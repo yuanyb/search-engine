@@ -48,7 +48,6 @@ func newTextProcessor(n int, db *db.DB) *textProcessor {
 
 func (p *textProcessor) textToInvertedIndex(documentId int, text string) invertedIndex {
 	index := invertedIndex{}
-	// todo N
 	nGramSplit(text, p.n, func(token string, pos int) error {
 		return p.tokenToPostingsLists(index, documentId, token, pos)
 	})
@@ -169,20 +168,29 @@ func (m *indexManager) merge(index invertedIndex) {
 func (m *indexManager) flush() {
 	for tokenId, item := range m.indexBuffer {
 		// 从数据库中取出来旧的索引
-		data, err := m.db.GetPostingsList(tokenId)
-		if err != nil {
-			// todo log
+		postings := m.fetchPostingsList(tokenId)
+		if postings == nil {
 			continue
 		}
-		postings := decodePostingsList(data)
 		// 内存中合并
 		postings = postings.merge(item.postings)
 		// 写回
-		data = postings.encode()
-		err = m.db.UpdatePostingsList(tokenId, data)
+		data := postings.encode()
+		err := m.db.UpdatePostingsList(tokenId, data)
 		if err != nil {
 			// todo log
 		}
 	}
 	m.indexBuffer = make(invertedIndex)
+}
+
+func (m *indexManager) fetchPostingsList(tokenId int) *postingsList {
+	// 先判断缓存是否命中
+	// ...
+	data, err := m.db.GetPostingsList(tokenId)
+	if err != nil || len(data) == 0 {
+		// todo log
+		return nil
+	}
+	return decodePostingsList(data)
 }
