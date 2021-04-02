@@ -6,17 +6,19 @@ import (
 )
 
 // TODO documentDb 使用 hbase
-type DB struct {
+type IndexDB struct {
 	documentDB *sql.DB
 	indexDB    *sql.DB
 
-	getTokenId      *sql.Stmt
-	storeToken      *sql.Stmt
-	getPostingsList *sql.Stmt
+	getTokenId         *sql.Stmt
+	storeToken         *sql.Stmt
+	getPostingsList    *sql.Stmt
+	updatePostingsList *sql.Stmt
+	getDocumentsCount  *sql.Stmt
 }
 
-func NewDB(documentDBPath, indexDBPath string) *DB {
-	db := new(DB)
+func NewIndexDB(documentDBPath, indexDBPath string) *IndexDB {
+	db := new(IndexDB)
 
 	docDB, err := sql.Open("sqlite3", documentDBPath)
 	handleDBInitError(err)
@@ -52,6 +54,14 @@ func NewDB(documentDBPath, indexDBPath string) *DB {
 	handleDBInitError(err)
 	db.getPostingsList = stmt
 
+	stmt, err = indexDB.Prepare("update token set postings = ? where id = ?")
+	handleDBInitError(err)
+	db.updatePostingsList = stmt
+
+	stmt, err = indexDB.Prepare("select count(*) from documents")
+	handleDBInitError(err)
+	db.getDocumentsCount = stmt
+
 	return db
 }
 
@@ -61,18 +71,25 @@ func handleDBInitError(err error) {
 	}
 }
 
-func (db *DB) GetTokenId(token string) (int, error) {
+func (db *IndexDB) GetTokenId(token string) (int, error) {
 	var id int
 	err := db.getTokenId.QueryRow(token).Scan(&id)
 	return id, err
 }
 
-func (db *DB) GetPostingsList(tokenId int) ([]byte, error) {
+func (db *IndexDB) GetPostingsList(tokenId int) ([]byte, error) {
 	var v []byte
 	err := db.getPostingsList.QueryRow(tokenId).Scan(&v)
 	return v, err
 }
 
-func (db *DB) UpdatePostingsList(tokenId int, data []byte) error {
-	return nil
+func (db *IndexDB) UpdatePostingsList(tokenId int, data []byte) error {
+	_, err := db.updatePostingsList.Exec(data, tokenId)
+	return err
+}
+
+func (db *IndexDB) GetDocumentsCount() (int, error) {
+	var count int
+	err := db.getDocumentsCount.QueryRow().Scan(&count)
+	return count, err
 }

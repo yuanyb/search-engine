@@ -6,7 +6,7 @@ type Engine struct {
 	// todo buffer
 	indexManager  *indexManager
 	textProcessor *textProcessor
-	db            *db.DB
+	db            *db.IndexDB
 }
 
 func NewEngine() *Engine {

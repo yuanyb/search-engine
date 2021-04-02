@@ -2,11 +2,14 @@
 package core
 
 import (
+	"math"
+	"search-engine/index/db"
 	"sort"
 )
 
 type searcher struct {
 	indexManager *indexManager
+	db           *db.IndexDB
 }
 
 // 文档查询游标，用于指示当前词元处理到了哪个文档
@@ -89,7 +92,11 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem) (results searchResu
 		phraseCount := searchPhrase(queryTokens, cursors)
 		if phraseCount > 0 {
 			// 打分
-			score := 0.0 // calcTfIdf()
+			docsCount, err := s.db.GetDocumentsCount()
+			if err != nil {
+				// todo log
+			}
+			score := calcTfIdf(queryTokens, cursors, docsCount)
 			results = append(results, searchResultItem{
 				documentId: baseDocId,
 				score:      score,
@@ -160,6 +167,23 @@ func calcBM25() float64 {
 	return 0
 }
 
-func calcTfIdf() float64 {
-	return 0
+//   TF 词频因子，表示一个单词在文档中出现的次数，一般在某个文档中反复出现的单词，
+// 往往能够表示文档的主题，即TF值越大，月能代表文档反应的内容，那么应给这个单词更大的权值。
+// 直接使用词频数作为TF值，不太准确，如单词T在D1中出现10次，在D2中出现了1次数次，不应该权
+// 值大10倍。因此一种计算公式为：W_tf = 1 + log(TF)，即词频数取log值来抑制过大的差异，+1
+// 是为了平滑结果，当log(TF)为0时，不至于权值为0。
+//   IDF 逆文档频率因子，表示文档集合范围的一种全局因子，`IDF = log(N/n_k)`，N是文档集合
+// 的文档个数，n_k表示单词k在其中多少个文档出现过（即文档频率），由公式可知，n_k越高，则其
+// IDF越小，即越多的文档包含某个单词，那么其IDF值越小，这个词区分不同文档的能力越差。
+//   TF*IDF 结合了两个特征向量。
+func calcTfIdf(tokens []*tokenIndexItem, cursors []docSearchCursor, docsCount int) float64 {
+	var score float64
+	for tokenId, item := range tokens {
+		// cursors[tokenId]对应一篇文档的倒排列表项，它的positions就是在对应文档的出现次数
+		TF := 1 + math.Log(float64(len(cursors[tokenId].positions)))
+		//
+		IDF := math.Log(float64(docsCount) / float64(item.documentCount))
+		score += TF * IDF
+	}
+	return score
 }

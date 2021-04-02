@@ -11,7 +11,7 @@ type indexManager struct {
 	indexBuffer          invertedIndex
 	bufferFlushThreshold int
 	bufferCount          int
-	db                   *db.DB
+	db                   *db.IndexDB
 }
 
 // 倒排索引 tokenId->tokenIndexItem
@@ -35,11 +35,11 @@ type postingsList struct {
 
 // 文本处理器
 type textProcessor struct {
-	db *db.DB
+	db *db.IndexDB
 	n  int // n-gram
 }
 
-func newTextProcessor(n int, db *db.DB) *textProcessor {
+func newTextProcessor(n int, db *db.IndexDB) *textProcessor {
 	return &textProcessor{
 		db: db,
 		n:  n,
