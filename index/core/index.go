@@ -8,7 +8,7 @@ import (
 
 // 索引管理器
 type indexManager struct {
-	indexBuffer          invertedIndex
+	indexBuffer          invertedIndex // 内存中的索引，待写入磁盘
 	bufferFlushThreshold int
 	bufferCount          int
 	db                   *db.IndexDB
@@ -30,7 +30,7 @@ type postingsList struct {
 	documentId int           // 文档编号
 	positions  []int         // 词元在该文档中的位置信息
 	next       *postingsList // 指向下一个倒排列表的指针
-	flag       uint8         // todo 0000_0000 0号位表示在正文中出现，1号位表示在标题中出现
+	titleEnd   int           // positions[:titleEnd] 是词元在标题中的位置信息，小于0则表示词元没有在对应文档标题中出现
 }
 
 // 文本处理器
@@ -46,16 +46,37 @@ func newTextProcessor(n int, db *db.IndexDB) *textProcessor {
 	}
 }
 
-func (p *textProcessor) textToInvertedIndex(documentId int, text string) invertedIndex {
+func (p *textProcessor) textToInvertedIndex(documentId int, document *parsedDocument) invertedIndex {
 	index := invertedIndex{}
-	nGramSplit(text, p.n, func(token string, pos int) error {
-		return p.tokenToPostingsLists(index, documentId, token, pos)
+	nGramSplit(document.title, p.n, func(token string, pos int) error {
+		return p.tokenToPostingsLists(index, documentId, token, pos, true)
+	})
+	nGramSplit(document.body, p.n, func(token string, pos int) error {
+		return p.tokenToPostingsLists(index, documentId, token, pos, false)
 	})
 	return index
 }
 
+// 将查询内容转换成倒排索引形式
+func (p *textProcessor) queryToTokens(query string) []*tokenIndexItem {
+	index := invertedIndex{}
+	nGramSplit(query, p.n, func(token string, pos int) error {
+		return p.tokenToPostingsLists(index, searchDocId, token, pos, true)
+	})
+	ret := make([]*tokenIndexItem, 0)
+	for _, item := range index {
+		ret = append(ret, item)
+	}
+	return ret
+}
+
 // 将一个词元转换成倒排列表
-func (p *textProcessor) tokenToPostingsLists(index invertedIndex, documentId int, token string, pos int) error {
+func (p *textProcessor) tokenToPostingsLists(index invertedIndex, documentId int, token string, pos int, isTitle bool) error {
+	if documentId == searchDocId {
+		// todo
+	} else {
+
+	}
 	tokenId, err := p.db.GetTokenId(token)
 	if err != nil {
 		return err
@@ -77,6 +98,10 @@ func (p *textProcessor) tokenToPostingsLists(index invertedIndex, documentId int
 	// 词元出现次数 +1
 	entry.postings.positions = append(entry.postings.positions, pos)
 	entry.positionsCount++
+	// 标题
+	if isTitle {
+		entry.postings.titleEnd++
+	}
 	return nil
 }
 
@@ -124,6 +149,8 @@ func (p *postingsList) encode() []byte {
 		pos += 4
 		binary.BigEndian.PutUint32(buf[pos:], uint32(len(p.positions)))
 		pos += 4
+		binary.BigEndian.PutUint16(buf[pos:], uint16(p.titleEnd))
+		pos += 2
 		for _, v := range p.positions {
 			binary.BigEndian.PutUint32(buf[pos:], uint32(v))
 			pos += 4
@@ -143,6 +170,8 @@ func decodePostingsList(data []byte) *postingsList {
 		pos += 4
 		length := int(binary.BigEndian.Uint32(data[pos:]))
 		pos += 4
+		p.titleEnd = int(binary.BigEndian.Uint16(data[pos:]))
+		pos += 2
 		for i := 0; i < length; i++ {
 			p.positions = append(p.positions, int(binary.BigEndian.Uint32(data[pos:])))
 			pos += 4
@@ -168,29 +197,23 @@ func (m *indexManager) merge(index invertedIndex) {
 func (m *indexManager) flush() {
 	for tokenId, item := range m.indexBuffer {
 		// 从数据库中取出来旧的索引
-		postings := m.fetchPostingsList(tokenId)
+		data, err := m.db.GetPostingsList(tokenId)
+		if err != nil || len(data) == 0 {
+			// todo log
+			continue
+		}
+		postings := decodePostingsList(data)
 		if postings == nil {
 			continue
 		}
 		// 内存中合并
 		postings = postings.merge(item.postings)
 		// 写回
-		data := postings.encode()
-		err := m.db.UpdatePostingsList(tokenId, data)
+		data = postings.encode()
+		err = m.db.UpdatePostingsList(tokenId, data)
 		if err != nil {
 			// todo log
 		}
 	}
 	m.indexBuffer = make(invertedIndex)
-}
-
-func (m *indexManager) fetchPostingsList(tokenId int) *postingsList {
-	// 先判断缓存是否命中
-	// ...
-	data, err := m.db.GetPostingsList(tokenId)
-	if err != nil || len(data) == 0 {
-		// todo log
-		return nil
-	}
-	return decodePostingsList(data)
 }

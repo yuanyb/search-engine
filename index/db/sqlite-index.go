@@ -93,3 +93,7 @@ func (db *IndexDB) GetDocumentsCount() (int, error) {
 	err := db.getDocumentsCount.QueryRow().Scan(&count)
 	return count, err
 }
+
+func (db *IndexDB) GetDocUrl(id int) string {
+	return ""
+}

@@ -2,14 +2,18 @@
 package core
 
 import (
+	"container/heap"
 	"math"
 	"search-engine/index/db"
+	"search-engine/index/util"
 	"sort"
+	"strings"
 )
 
+// buffer 转移到db包中
 type searcher struct {
-	indexManager *indexManager
-	db           *db.IndexDB
+	db             *db.IndexDB
+	postingsBuffer *buffer
 }
 
 // 文档查询游标，用于指示当前词元处理到了哪个文档
@@ -30,18 +34,85 @@ func (c *phraseSearchCursor) hasNextPos() bool {
 	return c.curIdx < len(c.positions)
 }
 
-type searchResults []searchResultItem
+type SearchResults struct {
+	Items      []searchResultItem
+	suggestion string
+}
+
+func (s SearchResults) Push(x interface{}) {
+	s.Items = append(s.Items, x.(searchResultItem))
+}
+
+func (s SearchResults) Pop() interface{} {
+	ret := s.Items[len(s.Items)-1]
+	s.Items = s.Items[:len(s.Items)-1]
+	return ret
+}
+
+func (s SearchResults) Len() int { return len(s.Items) }
+
+func (s SearchResults) Less(i, j int) bool { return s.Items[j].score < s.Items[i].score }
+
+func (s SearchResults) Swap(i, j int) { s.Items[i], s.Items[j] = s.Items[j], s.Items[i] }
+
+// 结果集合 s and s2 操作
+func (s SearchResults) and(s2 SearchResults) {
+	if s.Items == nil {
+		s.Items = s2.Items
+		return
+	}
+	set := make(map[int]*searchResultItem)
+	for _, item := range s2.Items {
+		set[item.documentId] = &item
+	}
+	newItems := make([]searchResultItem, 0)
+	for _, item := range s.Items {
+		if item, ok := set[item.documentId]; ok {
+			newItems = append(newItems, *item)
+		}
+	}
+	s.Items = newItems
+}
+
+// 结果集合 s not s2 操作
+func (s SearchResults) not(s2 SearchResults) {
+	set := make(map[int]*searchResultItem)
+	for _, item := range s2.Items {
+		set[item.documentId] = &item
+	}
+	newItems := make([]searchResultItem, 0)
+	for _, item := range s.Items {
+		if item, ok := set[item.documentId]; !ok {
+			newItems = append(newItems, *item)
+		}
+	}
+	s.Items = newItems
+}
 
 type searchResultItem struct {
-	documentId int
-	score      float64
+	documentId     int
+	score          float64
+	titleHighLight [][2]int // 结果高亮
+	bodyHighLight  [][2]int // 结果高亮
+}
+
+func newSearcher(db *db.IndexDB, postingsBufferSize int) *searcher {
+	getFunc := func(key interface{}) (interface{}, error) {
+		postings, err := db.GetPostingsList(key.(int))
+		if err != nil {
+			return nil, err
+		}
+		return decodePostingsList(postings), nil
+	}
+	return &searcher{
+		db:             db,
+		postingsBuffer: newBuffer(postingsBufferSize, getFunc),
+	}
 }
 
 // 检索文档
 // 没必要返回和在内存中保存全部结果，因为使用者也看不了那么多结果
-// abc xyz -ijk 通过空格切割，每部分再短语查询，'-'取补集
-// site:host 索引：host -> docId list
-func (s *searcher) searchDocs(queryTokens []*tokenIndexItem) (results searchResults) {
+func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) SearchResults {
 	// 将 queryToken 按文档数量升序排序，这样可以尽早结束比较
 	sort.Slice(queryTokens, func(i, j int) bool {
 		return queryTokens[i].documentCount < queryTokens[j].documentCount
@@ -52,20 +123,27 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem) (results searchResu
 	for i, item := range queryTokens {
 		// 词元 i 还没有建过索引
 		if item == nil {
-			return searchResults{}
+			return SearchResults{}
 		}
-		postings := s.indexManager.fetchPostingsList(item.tokenId)
+		postings := s.postingsBuffer.get(item.tokenId).(*postingsList)
 		// 词元 i 没有倒排列表
 		if postings == nil {
-			return searchResults{}
+			return SearchResults{}
 		}
 		cursors[i] = postings
 	}
+
+	results := SearchResults{Items: make([]searchResultItem, 50)}
+	heap.Init(results)
 
 	// 检索候选文档，以第一个词元的倒排列表（最短）为基准
 	for ; cursors[0] != nil; cursors[0] = cursors[0].next {
 		baseDocId := cursors[0].documentId
 		nextDocId := -1
+		// 如果该文档的URL不是指定域名的
+		if site != "" && !strings.HasSuffix(util.UrlToHost(s.db.GetDocUrl(baseDocId)), site) {
+			continue
+		}
 		// 对除基准词元外的所有词元，不断获其取下一个docId，直到当前docId不小于基准词元的docId
 		for i := 1; i < len(cursors); i++ {
 			for cursors[i] != nil && cursors[i].documentId < baseDocId {
@@ -73,7 +151,7 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem) (results searchResu
 			}
 			// cursors[i] 中的所有文档id都小于baseDocId，则不可能有结果
 			if cursors[i] == nil {
-				return searchResults{}
+				return SearchResults{}
 			}
 			if cursors[i].documentId > baseDocId {
 				nextDocId = cursors[i].documentId
@@ -87,28 +165,45 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem) (results searchResu
 			}
 			continue
 		}
-		// 进行短语搜索，如果短语搜索的结果过于少或者没有，
-		// 则可以返回包含查询内容最长部分的网页，或者进行同义词替换
-		phraseCount := searchPhrase(queryTokens, cursors)
-		if phraseCount > 0 {
+		item := &searchResultItem{documentId: baseDocId}
+		searchTitleOrBody := func(inTitle bool) {
+			// 进行短语搜索
+			phraseCount, highLight := searchPhrase(queryTokens, cursors, true)
 			// 打分
 			docsCount, err := s.db.GetDocumentsCount()
 			if err != nil {
 				// todo log
 			}
 			score := calcTfIdf(queryTokens, cursors, docsCount)
-			results = append(results, searchResultItem{
-				documentId: baseDocId,
-				score:      score,
-			})
+			if phraseCount > 0 {
+				// 有完整短语权重更大，只要有完整短语，score 就至少3倍，凭感觉来的
+				score *= 3 + math.Log(float64(phraseCount))
+			}
+			if inTitle { // 标题中的词元权值更高
+				score *= 3
+				item.titleHighLight = highLight
+			} else {
+				item.bodyHighLight = highLight
+			}
+			item.score += score
 		}
+		// 使用优先级队列限制结果数
+		results.Push(item)
+		if results.Len() > 100 {
+			heap.Pop(results) // 移除 score 最小的结果项
+		}
+		searchTitleOrBody(true)
+		searchTitleOrBody(false)
 	}
-	return
+	return results
 }
 
-// 检索文档中是否存在完全匹配的短语
-func searchPhrase(queryTokens []*tokenIndexItem, docCursors []docSearchCursor) int {
+// 检索文档或标题中是否存在完全匹配的短语
+// 还要返回不完整短语的位置信息，用于结果高亮
+// inTitle=true 表示在title中查询，否则在body中查询
+func searchPhrase(queryTokens []*tokenIndexItem, docCursors []docSearchCursor, inTitle bool) (int, [][2]int) {
 	phraseCount := 0
+	highLight := make([][2]int, 0)
 	// 初始化游标
 	count := 0 // 查询中的词元的总数
 	for _, item := range queryTokens {
@@ -120,7 +215,11 @@ func searchPhrase(queryTokens []*tokenIndexItem, docCursors []docSearchCursor) i
 		// query:aba123，这个查询中，a出现了两次，a对应item的positions就是 {0,2}
 		for _, pos := range item.postings.positions {
 			cursors[cursorPos].base = pos
-			cursors[cursorPos].positions = docCursors[i].positions
+			if inTitle {
+				cursors[cursorPos].positions = docCursors[i].positions[:docCursors[i].titleEnd]
+			} else {
+				cursors[cursorPos].positions = docCursors[i].positions[docCursors[i].titleEnd:]
+			}
 			cursors[cursorPos].curIdx = 0
 			cursorPos++
 		}
@@ -132,7 +231,7 @@ func searchPhrase(queryTokens []*tokenIndexItem, docCursors []docSearchCursor) i
 		// 然后逐一获得其他词元的偏移量，对比是否和第一个词元的偏移量相等，如果不相等
 		// 说明文档中的各个词元不相邻，也就不存在短语
 		offset := cursors[0].curPos() - cursors[0].base
-		nextOffset := offset
+		maxNextOffset, nextOffset := offset, offset
 		// 对于除第一个词元以外的所有词元，不断地向后读取出现位置，
 		// 直到其偏移量不小于第一个词元的偏移量为止
 		for i := 1; i < len(cursors); i++ {
@@ -141,13 +240,14 @@ func searchPhrase(queryTokens []*tokenIndexItem, docCursors []docSearchCursor) i
 			}
 			// 不能能再找到了
 			if !cursors[i].hasNextPos() {
-				return phraseCount
+				return phraseCount, highLight
 			}
 			// 对于其他词元，如果偏移量不等于第一个词元的偏移量就退出循环
 			if cursors[i].curPos()-cursors[i].base != offset {
 				nextOffset = cursors[i].curPos() - cursors[i].base
 				break
 			}
+			maxNextOffset = util.MaxInt(maxNextOffset, nextOffset)
 		}
 		if nextOffset > offset {
 			// 不断向后读取，直到第一个词元的偏移量不小于nextOffset为止
@@ -158,9 +258,43 @@ func searchPhrase(queryTokens []*tokenIndexItem, docCursors []docSearchCursor) i
 			// 找到了短语
 			phraseCount++
 			cursors[0].curIdx++
+			// 记住位置
+			highLight = append(highLight, [2]int{offset, maxNextOffset + 1})
 		}
 	}
-	return phraseCount
+	if len(highLight) == 0 {
+		highLight = append(highLight, findHighLight(cursors)...)
+	}
+	return phraseCount, highLight
+}
+
+// 构造高亮区间
+func findHighLight(cursors []phraseSearchCursor) [][2]int {
+	length := 0
+	for i := range cursors {
+		cursors[i].curIdx = 0
+		length += len(cursors[i].positions)
+	}
+	intervals := make([][2]int, length)
+	for i := range cursors {
+		for _, pos := range cursors[i].positions {
+			intervals = append(intervals, [2]int{pos, pos + 1})
+		}
+	}
+	sort.Slice(intervals, func(i, j int) bool {
+		return intervals[i][0] < intervals[j][0]
+	})
+	pos := 0
+	for i := 1; i < len(intervals); i++ {
+		// query:ABC  DOC:ABCXABGC  =>  AB:{0,4} BC:{1} => {0,1} {1,2}, {4,5} => {0,2} {4,5}
+		if intervals[i][0]-intervals[i-1][1] <= 2 {
+			intervals[pos][1] = intervals[i][1]
+		} else {
+			pos++
+			intervals[pos] = intervals[i]
+		}
+	}
+	return intervals[:pos+1] // 100长度的滑动窗口，判断哪个窗口高亮字符最多
 }
 
 func calcBM25() float64 {
