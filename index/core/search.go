@@ -10,7 +10,6 @@ import (
 	"strings"
 )
 
-// buffer 转移到db包中
 type searcher struct {
 	db *db.IndexDB
 }

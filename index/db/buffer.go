@@ -13,7 +13,7 @@ type buffer struct {
 	list    *list.List
 	_map    map[interface{}]*list.Element
 	maxSize int
-	getFunc getFunc // 缓存不命中时，获取元素的函数
+	getFunc getFunc // 缓存不命中时，获取数据的函数
 	lock    sync.Mutex
 }
 

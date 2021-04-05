@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	_ "github.com/mattn/go-sqlite3"
+	"search-engine/index/core"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,6 +28,7 @@ type IndexDB struct {
 	docUrlBuffer   *buffer
 	storeToken     *sql.Stmt
 	updatePostings *sql.Stmt
+	addDocument    *sql.Stmt
 }
 
 type IndexDBOptions struct {
@@ -97,6 +99,10 @@ func NewIndexDB(options *IndexDBOptions) *IndexDB {
 		err := db.getDocumentUrl.QueryRow(docId).Scan(&url)
 		return url, err
 	})
+	// 添加文档
+	stmt, err = docDB.Prepare("insert into documents(url, title, body) values(?,?,?)")
+	handleDBInitError(err)
+	db.addDocument = stmt
 
 	return db
 }
@@ -149,4 +155,13 @@ func (db *IndexDB) GetDocumentsCount() (int, error) {
 func (db *IndexDB) GetDocUrl(id int) (string, error) {
 	url, err := db.docUrlBuffer.get(id)
 	return url.(string), err
+}
+
+func (db *IndexDB) AddDocument(document *core.ParsedDocument) (int, error) {
+	res, err := db.addDocument.Exec(document.Url, document.Title, document.Body)
+	if err != nil {
+		return 0, nil
+	}
+	docId, err := res.LastInsertId()
+	return int(docId), err
 }

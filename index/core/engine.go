@@ -1,6 +1,7 @@
 package core
 
 import (
+	"math/rand"
 	"search-engine/index/db"
 	"strings"
 )
@@ -8,25 +9,45 @@ import (
 const searchDocId = -1024
 
 type Engine struct {
-	// todo buffer
 	indexManager  *indexManager
 	textProcessor *textProcessor
 	searcher      *searcher
 	db            *db.IndexDB
+
+	indexerChannels  []chan [2]string
+	indexWorkerCount int
 }
 
 func NewEngine() *Engine {
 	e := &Engine{}
+	// 启动构建索引协程，限制数量
+	for i := 0; i < e.indexWorkerCount; i++ {
+		go func(i int) {
+			for {
+				doc := <-e.indexerChannels[i]
+				parsedDocument := parseDocument(doc[1])
+				if parsedDocument == nil {
+					continue
+				}
+				parsedDocument.Url = doc[0]
+				docId, err := e.db.AddDocument(parsedDocument)
+				if err != nil {
+					continue
+				}
+				index := e.textProcessor.textToInvertedIndex(docId, parsedDocument)
+				e.indexManager.merge(index)
+			}
+		}(i)
+	}
 	return e
 }
 
-func (e *Engine) AddDocument(document string) {
-	parsedDocument := parseDocument(document)
-	docId := 0
-	index := e.textProcessor.textToInvertedIndex(docId, parsedDocument)
-	e.indexManager.merge(index)
+// 为一个文档构建索引
+func (e *Engine) AddDocument(url, document string) {
+	e.indexerChannels[rand.Intn(e.indexWorkerCount)] <- [2]string{url, document}
 }
 
+// 并发安全
 func (e *Engine) Search(query string) SearchResults {
 	var searchResults SearchResults
 	// 是否有非法关键词，邪教、黄色

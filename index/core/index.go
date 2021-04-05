@@ -4,6 +4,7 @@ package core
 import (
 	"encoding/binary"
 	"search-engine/index/db"
+	"sync"
 )
 
 // 索引管理器
@@ -12,6 +13,7 @@ type indexManager struct {
 	bufferFlushThreshold int
 	bufferCount          int
 	db                   *db.IndexDB
+	lock                 sync.Mutex
 }
 
 // 倒排索引 tokenId->tokenIndexItem
@@ -46,7 +48,7 @@ func newTextProcessor(n int, db *db.IndexDB) *textProcessor {
 	}
 }
 
-func (p *textProcessor) textToInvertedIndex(documentId int, document *parsedDocument) invertedIndex {
+func (p *textProcessor) textToInvertedIndex(documentId int, document *ParsedDocument) invertedIndex {
 	index := invertedIndex{}
 	nGramSplit(document.title, p.n, func(token string, pos int) error {
 		return p.tokenToPostingsLists(index, documentId, token, pos, true)
@@ -185,22 +187,25 @@ func decodePostings(data []byte) *postingsList {
 
 // 将 index 合并进索引管理器
 func (m *indexManager) merge(index invertedIndex) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	if m.indexBuffer == nil {
 		m.indexBuffer = index
 		return
 	}
 	m.indexBuffer.merge(index)
-	// 缓存数量大于阈值，刷新到存储器
+	// 缓存数量大于阈值，异步刷新到存储器
 	if m.bufferCount > m.bufferFlushThreshold {
-		m.flush()
+		go flushIndex(m.indexBuffer, m.db)
+		m.indexBuffer = make(invertedIndex)
 	}
 }
 
 // 将内存中的缓冲的索引与存储器中的索引合并后刷新到存储器中
-func (m *indexManager) flush() {
-	for tokenId, item := range m.indexBuffer {
+func flushIndex(index invertedIndex, destDB *db.IndexDB) {
+	for tokenId, item := range index {
 		// 从数据库中取出来旧的索引
-		data, err := m.db.GetPostings(tokenId)
+		data, err := destDB.GetPostings(tokenId)
 		if err != nil {
 			// todo log
 			continue
@@ -210,10 +215,9 @@ func (m *indexManager) flush() {
 		postings = postings.merge(item.postings)
 		// 写回
 		data = postings.encode()
-		err = m.db.UpdatePostings(tokenId, data)
+		err = destDB.UpdatePostings(tokenId, data)
 		if err != nil {
 			// todo log
 		}
 	}
-	m.indexBuffer = make(invertedIndex)
 }
