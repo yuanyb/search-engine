@@ -12,8 +12,7 @@ import (
 
 // buffer 转移到db包中
 type searcher struct {
-	db             *db.IndexDB
-	postingsBuffer *buffer
+	db *db.IndexDB
 }
 
 // 文档查询游标，用于指示当前词元处理到了哪个文档
@@ -97,16 +96,8 @@ type searchResultItem struct {
 }
 
 func newSearcher(db *db.IndexDB, postingsBufferSize int) *searcher {
-	getFunc := func(key interface{}) (interface{}, error) {
-		postings, err := db.GetPostingsList(key.(int))
-		if err != nil {
-			return nil, err
-		}
-		return decodePostingsList(postings), nil
-	}
 	return &searcher{
-		db:             db,
-		postingsBuffer: newBuffer(postingsBufferSize, getFunc),
+		db: db,
 	}
 }
 
@@ -125,7 +116,12 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) Search
 		if item == nil {
 			return SearchResults{}
 		}
-		postings := s.postingsBuffer.get(item.tokenId).(*postingsList)
+		data, err := s.db.GetPostings(item.tokenId)
+		if err != nil {
+			// todo log
+			return SearchResults{}
+		}
+		postings := decodePostings(data)
 		// 词元 i 没有倒排列表
 		if postings == nil {
 			return SearchResults{}
@@ -140,10 +136,6 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) Search
 	for ; cursors[0] != nil; cursors[0] = cursors[0].next {
 		baseDocId := cursors[0].documentId
 		nextDocId := -1
-		// 如果该文档的URL不是指定域名的
-		if site != "" && !strings.HasSuffix(util.UrlToHost(s.db.GetDocUrl(baseDocId)), site) {
-			continue
-		}
 		// 对除基准词元外的所有词元，不断获其取下一个docId，直到当前docId不小于基准词元的docId
 		for i := 1; i < len(cursors); i++ {
 			for cursors[i] != nil && cursors[i].documentId < baseDocId {
@@ -164,6 +156,13 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) Search
 				cursors[0] = cursors[0].next
 			}
 			continue
+		}
+		// 如果该文档的URL不是指定域名下的
+		if site != "" {
+			u, err := s.db.GetDocUrl(baseDocId)
+			if err != nil || !strings.HasSuffix(util.UrlToHost(u), site) {
+				continue
+			}
 		}
 		item := &searchResultItem{documentId: baseDocId}
 		searchTitleOrBody := func(inTitle bool) {
@@ -286,7 +285,7 @@ func findHighLight(cursors []phraseSearchCursor) [][2]int {
 	})
 	pos := 0
 	for i := 1; i < len(intervals); i++ {
-		// query:ABC  DOC:ABCXABGC  =>  AB:{0,4} BC:{1} => {0,1} {1,2}, {4,5} => {0,2} {4,5}
+		// query:ABC  DOC:ABCXABGC  =>  AB:{0,4} BC:{1} => {0,1} {1,2}, {4,5} => {0,5}
 		if intervals[i][0]-intervals[i-1][1] <= 2 {
 			intervals[pos][1] = intervals[i][1]
 		} else {

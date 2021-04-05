@@ -26,7 +26,7 @@ func TestPostingsList_Encode(t *testing.T) {
 	data := p.encode()
 
 	// test
-	pa, pb := p, decodePostingsList(data)
+	pa, pb := p, decodePostings(data)
 	for ; pa != nil && pb != nil; pa, pb = pa.next, pb.next {
 		if pa.documentId != pb.documentId || len(pa.positions) != len(pb.positions) {
 			t.Error("failed")

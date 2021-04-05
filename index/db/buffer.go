@@ -1,8 +1,9 @@
 // 缓存：token->Items，lru
-package core
+package db
 
 import (
 	"container/list"
+	"sync"
 )
 
 type getFunc = func(interface{}) (interface{}, error)
@@ -13,6 +14,7 @@ type buffer struct {
 	_map    map[interface{}]*list.Element
 	maxSize int
 	getFunc getFunc // 缓存不命中时，获取元素的函数
+	lock    sync.Mutex
 }
 
 type node struct {
@@ -28,23 +30,25 @@ func newBuffer(size int, getFunc getFunc) *buffer {
 	}
 }
 
-func (b *buffer) get(key interface{}) (val interface{}) {
+func (b *buffer) get(key interface{}) (interface{}, error) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	e, ok := b._map[key]
 	if !ok {
 		v, err := b.getFunc(key)
 		if err != nil {
 			// todo log
-			return nil
+			return nil, err
 		}
-		b.add(key, v)
-		return v
+		b._add(key, v)
+		return v, nil
 	}
 	b.list.Remove(e)
 	b.list.PushFront(e)
-	return e.Value.(*node).value
+	return e.Value.(*node).value, nil
 }
 
-func (b *buffer) add(key, value interface{}) {
+func (b *buffer) _add(key, value interface{}) {
 	if b.list.Len() >= b.maxSize {
 		e := b.list.Remove(b.list.Back())
 		delete(b._map, e.(*node).key)
@@ -53,11 +57,12 @@ func (b *buffer) add(key, value interface{}) {
 	b._map[key] = e
 }
 
-func (b *buffer) del(key interface{}) {
-	e, ok := b._map[key]
-	if !ok {
-		return
-	}
-	b.list.Remove(e)
-	delete(b._map, key)
-}
+//
+//func (b *buffer) _del(key interface{}) {
+//	e, ok := b._map[key]
+//	if !ok {
+//		return
+//	}
+//	b.list.Remove(e)
+//	delete(b._map, key)
+//}

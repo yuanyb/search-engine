@@ -72,20 +72,14 @@ func (p *textProcessor) queryToTokens(query string) []*tokenIndexItem {
 
 // 将一个词元转换成倒排列表
 func (p *textProcessor) tokenToPostingsLists(index invertedIndex, documentId int, token string, pos int, isTitle bool) error {
-	if documentId == searchDocId {
-		// todo
-	} else {
-
-	}
-	tokenId, err := p.db.GetTokenId(token)
+	tokenId, docsCount, err := p.db.GetTokenId(token)
 	if err != nil {
 		return err
 	}
-	entry, ok := index[tokenId]
+	item, ok := index[tokenId]
 	if !ok {
-		entry = &tokenIndexItem{
+		item = &tokenIndexItem{
 			tokenId:        tokenId,
-			documentCount:  1,
 			positionsCount: 0,
 			postings: &postingsList{
 				documentId: documentId,
@@ -93,14 +87,20 @@ func (p *textProcessor) tokenToPostingsLists(index invertedIndex, documentId int
 				next:       nil,
 			},
 		}
-		index[tokenId] = entry
+		// 如果时检索时调用，则文档数量就是实际值；建索引时调用就是当前文档（个数1）
+		if documentId == searchDocId {
+			item.documentCount = docsCount
+		} else {
+			item.documentCount = 1
+		}
+		index[tokenId] = item
 	}
 	// 词元出现次数 +1
-	entry.postings.positions = append(entry.postings.positions, pos)
-	entry.positionsCount++
+	item.postings.positions = append(item.postings.positions, pos)
+	item.positionsCount++
 	// 标题
 	if isTitle {
-		entry.postings.titleEnd++
+		item.postings.titleEnd++
 	}
 	return nil
 }
@@ -110,7 +110,7 @@ func (i invertedIndex) merge(index invertedIndex) {
 	for tokenId, item := range index {
 		baseItem, ok := i[tokenId]
 		if ok {
-			baseItem.documentCount++
+			baseItem.documentCount += item.documentCount
 			baseItem.positionsCount += item.positionsCount
 			baseItem.postings = baseItem.postings.merge(item.postings)
 		} else {
@@ -121,6 +121,9 @@ func (i invertedIndex) merge(index invertedIndex) {
 
 // 合并倒排列表，文档ID小的列表项在前
 func (p *postingsList) merge(postings *postingsList) *postingsList {
+	if postings == nil {
+		return p
+	}
 	head := new(postingsList)
 	pc, pa, pb := head, p, postings
 	for pa != nil || pb != nil {
@@ -160,7 +163,7 @@ func (p *postingsList) encode() []byte {
 }
 
 // 将二进制数据解码成倒排列表
-func decodePostingsList(data []byte) *postingsList {
+func decodePostings(data []byte) *postingsList {
 	head := new(postingsList)
 	p := head
 	for pos := 0; pos < len(data); {
@@ -197,20 +200,17 @@ func (m *indexManager) merge(index invertedIndex) {
 func (m *indexManager) flush() {
 	for tokenId, item := range m.indexBuffer {
 		// 从数据库中取出来旧的索引
-		data, err := m.db.GetPostingsList(tokenId)
-		if err != nil || len(data) == 0 {
+		data, err := m.db.GetPostings(tokenId)
+		if err != nil {
 			// todo log
 			continue
 		}
-		postings := decodePostingsList(data)
-		if postings == nil {
-			continue
-		}
+		postings := decodePostings(data)
 		// 内存中合并
 		postings = postings.merge(item.postings)
 		// 写回
 		data = postings.encode()
-		err = m.db.UpdatePostingsList(tokenId, data)
+		err = m.db.UpdatePostings(tokenId, data)
 		if err != nil {
 			// todo log
 		}
