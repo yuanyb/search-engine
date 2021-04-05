@@ -3,7 +3,6 @@ package db
 import (
 	"database/sql"
 	_ "github.com/mattn/go-sqlite3"
-	"search-engine/index/core"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -157,8 +156,8 @@ func (db *IndexDB) GetDocUrl(id int) (string, error) {
 	return url.(string), err
 }
 
-func (db *IndexDB) AddDocument(document *core.ParsedDocument) (int, error) {
-	res, err := db.addDocument.Exec(document.Url, document.Title, document.Body)
+func (db *IndexDB) AddDocument(url, title, body string) (int, error) {
+	res, err := db.addDocument.Exec(url, title, body)
 	if err != nil {
 		return 0, nil
 	}

@@ -29,8 +29,7 @@ func NewEngine() *Engine {
 				if parsedDocument == nil {
 					continue
 				}
-				parsedDocument.Url = doc[0]
-				docId, err := e.db.AddDocument(parsedDocument)
+				docId, err := e.db.AddDocument(doc[0], parsedDocument.title, parsedDocument.body)
 				if err != nil {
 					continue
 				}

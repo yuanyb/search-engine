@@ -48,7 +48,7 @@ func newTextProcessor(n int, db *db.IndexDB) *textProcessor {
 	}
 }
 
-func (p *textProcessor) textToInvertedIndex(documentId int, document *ParsedDocument) invertedIndex {
+func (p *textProcessor) textToInvertedIndex(documentId int, document *parsedDocument) invertedIndex {
 	index := invertedIndex{}
 	nGramSplit(document.title, p.n, func(token string, pos int) error {
 		return p.tokenToPostingsLists(index, documentId, token, pos, true)
@@ -142,23 +142,20 @@ func (p *postingsList) merge(postings *postingsList) *postingsList {
 	return head.next
 }
 
-// 将倒排列表编码成二进制数据
+// 将倒排列表编码成二进制数据，使用 variable-byte 编码压缩索引
 func (p *postingsList) encode() []byte {
-	size := 0
-	for p2 := p; p2 != nil; p2 = p2.next {
-		size += 4 + 4 + 4*len(p2.positions)
-	}
-	buf := make([]byte, size)
-	for pos := 0; p != nil; p = p.next {
-		binary.BigEndian.PutUint32(buf[pos:], uint32(p.documentId))
-		pos += 4
-		binary.BigEndian.PutUint32(buf[pos:], uint32(len(p.positions)))
-		pos += 4
-		binary.BigEndian.PutUint16(buf[pos:], uint16(p.titleEnd))
-		pos += 2
-		for _, v := range p.positions {
-			binary.BigEndian.PutUint32(buf[pos:], uint32(v))
-			pos += 4
+	var buf []byte
+	tmp := make([]byte, binary.MaxVarintLen64)
+	for ; p != nil; p = p.next {
+		length := binary.PutVarint(tmp, int64(p.documentId))
+		buf = append(buf, tmp[:length]...)
+		length = binary.PutVarint(tmp, int64(len(p.positions)))
+		buf = append(buf, tmp[:length]...)
+		length = binary.PutVarint(tmp, int64(p.titleEnd))
+		buf = append(buf, tmp[:length]...)
+		for _, pos := range p.positions {
+			length = binary.PutVarint(tmp, int64(pos))
+			buf = append(buf, tmp[:length]...)
 		}
 	}
 	return buf
@@ -171,15 +168,22 @@ func decodePostings(data []byte) *postingsList {
 	for pos := 0; pos < len(data); {
 		p.next = new(postingsList)
 		p = p.next
-		p.documentId = int(binary.BigEndian.Uint32(data[pos:]))
-		pos += 4
-		length := int(binary.BigEndian.Uint32(data[pos:]))
-		pos += 4
-		p.titleEnd = int(binary.BigEndian.Uint16(data[pos:]))
-		pos += 2
-		for i := 0; i < length; i++ {
-			p.positions = append(p.positions, int(binary.BigEndian.Uint32(data[pos:])))
-			pos += 4
+		x, length := binary.Varint(data[pos:])
+		pos += length
+		p.documentId = int(x)
+
+		x, length = binary.Varint(data[pos:])
+		pos += length
+		sliceLen := int(x)
+
+		x, length = binary.Varint(data[pos:])
+		pos += length
+		p.titleEnd = int(x)
+
+		for i := 0; i < sliceLen; i++ {
+			x, length = binary.Varint(data[pos:])
+			pos += length
+			p.positions = append(p.positions, int(x))
 		}
 	}
 	return head.next
