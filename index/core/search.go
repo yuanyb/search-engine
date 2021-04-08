@@ -32,9 +32,10 @@ func (c *phraseSearchCursor) hasNextPos() bool {
 	return c.curIdx < len(c.positions)
 }
 
+// 搜索结果
 type SearchResults struct {
-	Items      []searchResultItem
-	suggestion string
+	Items      []searchResultItem `json:"items"`
+	Suggestion string             `json:"suggestion,omitempty"`
 }
 
 func (s SearchResults) Push(x interface{}) {
@@ -54,7 +55,7 @@ func (s SearchResults) Less(i, j int) bool { return s.Items[j].score < s.Items[i
 func (s SearchResults) Swap(i, j int) { s.Items[i], s.Items[j] = s.Items[j], s.Items[i] }
 
 // 结果集合 s and s2 操作
-func (s SearchResults) and(s2 SearchResults) {
+func (s *SearchResults) and(s2 SearchResults) {
 	if s.Items == nil {
 		s.Items = s2.Items
 		return
@@ -73,7 +74,7 @@ func (s SearchResults) and(s2 SearchResults) {
 }
 
 // 结果集合 s not s2 操作
-func (s SearchResults) not(s2 SearchResults) {
+func (s *SearchResults) not(s2 SearchResults) {
 	set := make(map[int]*searchResultItem)
 	for _, item := range s2.Items {
 		set[item.documentId] = &item
@@ -87,14 +88,75 @@ func (s SearchResults) not(s2 SearchResults) {
 	s.Items = newItems
 }
 
+const (
+	highlightPrefix = `<span style="color:red">`
+	highlightSuffix = `</span>`
+)
+
+// 获取结果信息及结果高亮
+func (s *SearchResults) applyHighlight(db *db.IndexDB) {
+	items := s.Items
+	for i := range items {
+		bh := items[i].bodyHighlight
+		start, length := bh[0][0], bh[len(bh)][1]-bh[0][0]+1
+		if padding := (100 - length + 1) / 2; start-padding < 0 {
+			length += padding - start
+			start = 0
+		}
+		url, title, abstract, err := db.GetDocumentDetail(items[i].documentId, start, length)
+		if err != nil {
+			items[i].documentId = -1 // 删除这个结果项
+			continue
+		}
+		items[i].Url = url
+		// title插入高亮标签
+		builder := &strings.Builder{}
+		var pos int
+		// title:abcd1234  h:{{2,3}, {5,6}}  =>  ab <span...> cd </span> 1 <span...> 12 </span> 34
+		for _, h := range items[i].titleHighlight {
+			builder.WriteString(title[pos:h[0]])
+			builder.WriteString(highlightPrefix)
+			builder.WriteString(title[h[0] : h[1]+1])
+			builder.WriteString(highlightSuffix)
+			pos = h[1] + 1
+		}
+		items[i].Title = builder.String()
+		// body插入高亮标签
+		builder.Reset()
+		pos = 0
+		for _, h := range items[i].bodyHighlight {
+			h[0], h[1] = h[0]-start, h[1]-start
+			builder.WriteString(abstract[pos:h[0]])
+			builder.WriteString(highlightPrefix)
+			builder.WriteString(abstract[h[0] : h[1]+1])
+			builder.WriteString(highlightSuffix)
+			pos = h[1] + 1
+		}
+		items[i].Abstract = builder.String()
+	}
+
+	var newItems []searchResultItem
+	for i := range items {
+		if items[i].documentId == -1 {
+			continue
+		}
+		newItems = append(newItems, items[i])
+	}
+	s.Items = newItems
+}
+
 type searchResultItem struct {
 	documentId     int
 	score          float64
-	titleHighLight [][2]int // 结果高亮
-	bodyHighLight  [][2]int // 结果高亮
+	titleHighlight [][2]int // 结果高亮
+	bodyHighlight  [][2]int
+	// 返回的数据
+	Url      string
+	Title    string
+	Abstract string
 }
 
-func newSearcher(db *db.IndexDB, postingsBufferSize int) *searcher {
+func newSearcher(db *db.IndexDB) *searcher {
 	return &searcher{
 		db: db,
 	}
@@ -179,9 +241,9 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) Search
 			}
 			if inTitle { // 标题中的词元权值更高
 				score *= 3
-				item.titleHighLight = highLight
+				item.titleHighlight = highLight
 			} else {
-				item.bodyHighLight = highLight
+				item.bodyHighlight = highLight
 			}
 			item.score += score
 		}
@@ -268,17 +330,20 @@ func searchPhrase(queryTokens []*tokenIndexItem, docCursors []docSearchCursor, i
 
 // 构造高亮区间
 func findHighLight(cursors []phraseSearchCursor) [][2]int {
+	// 重置 curIdx
 	length := 0
 	for i := range cursors {
 		cursors[i].curIdx = 0
 		length += len(cursors[i].positions)
 	}
-	intervals := make([][2]int, length)
+	// 将位置信息转换成区间信息
+	intervals := make([][2]int, 0, length)
 	for i := range cursors {
 		for _, pos := range cursors[i].positions {
-			intervals = append(intervals, [2]int{pos, pos + 1})
+			intervals = append(intervals, [2]int{pos, pos + 1}) // todo N(n-gram)
 		}
 	}
+	// 排序合并区间
 	sort.Slice(intervals, func(i, j int) bool {
 		return intervals[i][0] < intervals[j][0]
 	})
@@ -292,7 +357,28 @@ func findHighLight(cursors []phraseSearchCursor) [][2]int {
 			intervals[pos] = intervals[i]
 		}
 	}
-	return intervals[:pos+1] // 100长度的滑动窗口，判断哪个窗口高亮字符最多
+	// 100长度的滑动窗口，判断哪个窗口高亮字符最多
+	intervals = intervals[:pos+1]
+	var maxLeft, maxRight, maxLengthSum int
+	curLeft, curRight, curLengthSum := 0, 0, intervals[0][1]-intervals[0][0]+1
+	for curRight < len(intervals) {
+		if intervals[curRight][1]-intervals[curLeft][0]+1 <= 100 {
+			curRight++
+			if curRight >= len(intervals) {
+				break
+			}
+			curLengthSum += intervals[curRight][1] - intervals[curRight][0] + 1
+		}
+		for curLeft <= curRight && curRight < len(intervals) && intervals[curRight][1]-intervals[curLeft][0]+1 > 100 {
+			curLengthSum -= intervals[curLeft][1] - intervals[curLeft][0] + 1
+			curLeft++
+		}
+		if curLengthSum > maxLengthSum {
+			maxLengthSum = curLengthSum
+			maxLeft, maxRight = curLeft, curRight
+		}
+	}
+	return intervals[maxLeft : maxRight+1]
 }
 
 func calcBM25() float64 {

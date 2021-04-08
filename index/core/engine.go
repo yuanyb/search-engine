@@ -2,6 +2,7 @@ package core
 
 import (
 	"math/rand"
+	"search-engine/index/config"
 	"search-engine/index/db"
 	"strings"
 )
@@ -19,7 +20,28 @@ type Engine struct {
 }
 
 func NewEngine() *Engine {
-	e := &Engine{}
+	conf := config.GlobalConfig
+	dbOptions := &db.IndexDBOptions{
+		DocUrlBufferSize:   conf.DocUrlBufferSize,
+		TokenIdBufferSize:  conf.TokenIdBufferSize,
+		PostingsBufferSize: conf.PostingsBufferSize,
+		DocumentDBPath:     conf.DocumentDBPath,
+		IndexDBPath:        conf.IndexDBPath,
+	}
+	indexDBb := db.NewIndexDB(dbOptions)
+	e := &Engine{
+		indexManager:     newIndexManager(indexDBb),
+		textProcessor:    newTextProcessor(conf.TokenN, indexDBb),
+		searcher:         newSearcher(indexDBb),
+		db:               indexDBb,
+		indexerChannels:  make([]chan [2]string, conf.IndexWorkerCount),
+		indexWorkerCount: conf.IndexWorkerCount,
+	}
+
+	for i := 0; i < len(e.indexerChannels); i++ {
+		e.indexerChannels[i] = make(chan [2]string, conf.IndexerChannelLength)
+	}
+
 	// 启动构建索引协程，限制数量
 	for i := 0; i < e.indexWorkerCount; i++ {
 		go func(i int) {
@@ -55,10 +77,11 @@ func (e *Engine) Search(query string) SearchResults {
 	}
 	// 搜索建议，纠错
 	if strings.IndexByte(query, ' ') == -1 {
-		if c, ok := errorCorrect(query); ok {
-			searchResults.suggestion = c
+		if c, ok := suggest(query); ok {
+			searchResults.Suggestion = c
 		}
 	}
+	// 检索并合并结果
 	parsedQuery := parseQuery(query)
 	for _, keyword := range parsedQuery.keywords {
 		r := e.searcher.searchDocs(e.textProcessor.queryToTokens(keyword), parsedQuery.site)
@@ -68,5 +91,7 @@ func (e *Engine) Search(query string) SearchResults {
 		r := e.searcher.searchDocs(e.textProcessor.queryToTokens(exclusion), parsedQuery.site)
 		searchResults.not(r)
 	}
+	// 获取文档信息及高亮结果
+	searchResults.applyHighlight(e.db)
 	return searchResults
 }

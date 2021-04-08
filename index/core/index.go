@@ -10,8 +10,8 @@ import (
 // 索引管理器
 type indexManager struct {
 	indexBuffer          invertedIndex // 内存中的索引，待写入磁盘
-	bufferFlushThreshold int
-	bufferCount          int
+	bufferFlushThreshold int           // 阈值
+	indexCount           int           // 当前索引的文档数量
 	db                   *db.IndexDB
 	lock                 sync.Mutex
 }
@@ -45,6 +45,15 @@ func newTextProcessor(n int, db *db.IndexDB) *textProcessor {
 	return &textProcessor{
 		db: db,
 		n:  n,
+	}
+}
+
+func newIndexManager(db *db.IndexDB) *indexManager {
+	return &indexManager{
+		indexBuffer:          make(invertedIndex),
+		bufferFlushThreshold: 0,
+		db:                   db,
+		lock:                 sync.Mutex{},
 	}
 }
 
@@ -199,7 +208,7 @@ func (m *indexManager) merge(index invertedIndex) {
 	}
 	m.indexBuffer.merge(index)
 	// 缓存数量大于阈值，异步刷新到存储器
-	if m.bufferCount > m.bufferFlushThreshold {
+	if m.indexCount > m.bufferFlushThreshold {
 		go flushIndex(m.indexBuffer, m.db)
 		m.indexBuffer = make(invertedIndex)
 	}

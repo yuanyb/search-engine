@@ -67,7 +67,7 @@ func parseQuery(query string) *parsedQuery {
 	return ret
 }
 
-func errorCorrect(query string) (string, bool) {
+func suggest(query string) (string, bool) {
 	// 如果词典中没有 query 这个这个单词，则可以判断编辑距离，多级map
 	return "", false
 }

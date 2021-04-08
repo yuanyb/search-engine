@@ -1,5 +1,5 @@
 // 缓存：token->Items，lru
-package db
+package util
 
 import (
 	"container/list"
@@ -9,7 +9,7 @@ import (
 type getFunc = func(interface{}) (interface{}, error)
 
 // lru
-type buffer struct {
+type Buffer struct {
 	list    *list.List
 	_map    map[interface{}]*list.Element
 	maxSize int
@@ -21,8 +21,8 @@ type node struct {
 	key, value interface{}
 }
 
-func newBuffer(size int, getFunc getFunc) *buffer {
-	return &buffer{
+func NewBuffer(size int, getFunc getFunc) *Buffer {
+	return &Buffer{
 		list:    list.New(),
 		_map:    make(map[interface{}]*list.Element, size),
 		maxSize: size,
@@ -30,7 +30,7 @@ func newBuffer(size int, getFunc getFunc) *buffer {
 	}
 }
 
-func (b *buffer) get(key interface{}) (interface{}, error) {
+func (b *Buffer) Get(key interface{}) (interface{}, error) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	e, ok := b._map[key]
@@ -48,7 +48,7 @@ func (b *buffer) get(key interface{}) (interface{}, error) {
 	return e.Value.(*node).value, nil
 }
 
-func (b *buffer) _add(key, value interface{}) {
+func (b *Buffer) _add(key, value interface{}) {
 	if b.list.Len() >= b.maxSize {
 		e := b.list.Remove(b.list.Back())
 		delete(b._map, e.(*node).key)
