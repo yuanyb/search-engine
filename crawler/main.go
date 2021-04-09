@@ -1,15 +1,13 @@
 package main
 
 import (
-	"search-engine/crawler/downloader"
-	"search-engine/crawler/engine"
-	"search-engine/crawler/scheduler"
+	"search-engine/crawler/core"
 )
 
 func main() {
-	engine.NewCrawlerEngine(
-		scheduler.NewBFScheduler(),
-		downloader.GlobalDl,
+	core.NewCrawlerEngine(
+		core.NewBFScheduler(),
+		core.GlobalDl,
 		100,
 		[]string{"http://www.qut.edu.cn"},
 	).Run()

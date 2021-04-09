@@ -1,4 +1,4 @@
-package downloader
+package core
 
 import (
 	"fmt"

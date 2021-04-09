@@ -1,9 +1,13 @@
 // 网页数据处理器
-package data
+package core
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"regexp"
+	"search-engine/crawler/config"
 	"strings"
 )
 
@@ -41,7 +45,19 @@ func trimFragment(url string) string {
 	return url
 }
 
-// 抽取网页中的文本信息
-func ExtractText(document string) string {
-	return ""
+func SendDocument(url, document string) {
+	// 异步发送
+	go func() {
+		j, _ := json.Marshal(map[string]string{
+			"url":      url,
+			"document": document,
+		})
+		retryCount := config.Get().RetryCount
+		for i := 0; i < retryCount+1; i++ {
+			_, err := http.Post(config.LocalConfig["indexer.server"], "application/json", bytes.NewReader(j))
+			if err == nil {
+				break
+			}
+		}
+	}()
 }

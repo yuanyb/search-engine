@@ -1,10 +1,9 @@
-package scheduler
+package core
 
 import (
 	"container/heap"
 	"container/list"
 	"search-engine/crawler/config"
-	"search-engine/crawler/robots"
 )
 
 // Scheduler 表示爬虫的抓取 URL 的调度策略
@@ -44,7 +43,7 @@ func (b *BFScheduler) Empty() bool {
 func (b *BFScheduler) AddSeedUrls(seedUrls []string) {
 	for _, seedUrl := range seedUrls {
 		// 初始化种子 url 的 robots.txt
-		if robots.Allow(seedUrl, config.Get().Useragent) {
+		if Allow(seedUrl, config.Get().Useragent) {
 			b.queue.PushBack(seedUrl)
 		}
 	}

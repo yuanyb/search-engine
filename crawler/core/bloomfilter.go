@@ -1,5 +1,5 @@
 // 布隆过滤器，用于记录已经抓取过的网页
-package engine
+package core
 
 import (
 	"search-engine/crawler/util"

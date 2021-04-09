@@ -1,4 +1,4 @@
-package engine
+package core
 
 import (
 	"fmt"
@@ -6,10 +6,6 @@ import (
 	"net"
 	"net/url"
 	"search-engine/crawler/config"
-	"search-engine/crawler/data"
-	"search-engine/crawler/downloader"
-	"search-engine/crawler/robots"
-	"search-engine/crawler/scheduler"
 	"search-engine/crawler/util"
 	"time"
 )
@@ -17,17 +13,23 @@ import (
 // 网页文档的下载、处理、存储由多个 goroutine 执行
 type CrawlerEngine struct {
 	// 下载完某个网页文档后解析到的 urlGroup，engine 将其交给 URL 调度器
-	urlGroupChan chan scheduler.UrlGroup
+	urlGroupChan chan UrlGroup
 	// 下载器
-	downloader downloader.Downloader
+	downloader Downloader
 	// 传给下载器的 URL，channel 的缓冲区要很长
 	urlChan []chan string
 	// 调度策略
-	scheduler scheduler.Scheduler
+	scheduler Scheduler
 	// 协程数量
 	goroutineCount int
 	// 种子 URL
 	seedUrls []string
+}
+
+// UrlGroup 表示一个 URL 组，Leader 这个 URL 对应页面文档中的所有链接就是 Members
+type UrlGroup struct {
+	Leader  string
+	Members []string
 }
 
 func (e *CrawlerEngine) startCrawlerGoroutine() {
@@ -49,14 +51,13 @@ func (e *CrawlerEngine) startCrawlerGoroutine() {
 					continue
 				}
 
-				// todo document 持久化
-
-				// 从网页中提取出 URL、过滤，然后交给调度器
-				urls := data.ExtractUrls(u, document)
+				// 发送document，从网页中提取出 URL、过滤，然后交给调度器
+				SendDocument(u, document)
+				urls := ExtractUrls(u, document)
 				urls = e.filterUrl(urls)
 				// 打散 url 列表，使各个 crawler goroutine 更加均衡
 				util.ShuffleStringSlice(urls)
-				e.urlGroupChan <- scheduler.UrlGroup{Leader: u, Members: urls}
+				e.urlGroupChan <- UrlGroup{Leader: u, Members: urls}
 				e.crawlerWait()
 				info := fmt.Sprintf("crawler-%d ok, url:%s, time:%.1fs", num, u, time.Now().Sub(begin).Seconds())
 				println(info)
@@ -73,7 +74,7 @@ func (e *CrawlerEngine) filterUrl(urls []string) []string {
 
 	for _, u := range urls {
 		// robots
-		if !robots.Allow(u, config.Get().Useragent) {
+		if !Allow(u, config.Get().Useragent) {
 			continue
 		}
 
@@ -190,7 +191,7 @@ func (e *CrawlerEngine) Run() {
 	<-make(chan byte)
 }
 
-func NewCrawlerEngine(sch scheduler.Scheduler, dl downloader.Downloader, goCount int, seedUrls []string) *CrawlerEngine {
+func NewCrawlerEngine(sch Scheduler, dl Downloader, goCount int, seedUrls []string) *CrawlerEngine {
 	var chanList = make([]chan string, goCount)
 	for i := 0; i < goCount; i++ {
 		// 大容量的 buffered channel 是为了能让 crawler goroutine 都能有事干，
@@ -204,7 +205,7 @@ func NewCrawlerEngine(sch scheduler.Scheduler, dl downloader.Downloader, goCount
 		goroutineCount: goCount,
 		seedUrls:       seedUrls,
 		urlChan:        chanList,
-		urlGroupChan:   make(chan scheduler.UrlGroup, goCount*100),
+		urlGroupChan:   make(chan UrlGroup, goCount*100),
 	}
 	return engine
 }

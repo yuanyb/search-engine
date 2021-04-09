@@ -1,12 +1,11 @@
 // 解析 robots.txt
-package robots
+package core
 
 import (
 	"bufio"
 	"fmt"
 	"io"
 	"net/url"
-	"search-engine/crawler/downloader"
 	"strings"
 	"sync"
 )
@@ -123,7 +122,7 @@ func getRobot(parsedUrl *url.URL, useragent string) *robots {
 	// 从 robotsMap 中先获取 robots，如果没有则添加
 	if _, ok := robotsMap[parsedUrl.Host]; !ok {
 		robotsUrl := fmt.Sprintf("%s://%s/robots.txt", parsedUrl.Scheme, parsedUrl.Host)
-		robotsTxt, err := downloader.GlobalDl.DownloadText(robotsUrl)
+		robotsTxt, err := GlobalDl.DownloadText(robotsUrl)
 		// 如果 robots.txt 不存在，则在 robotsMap 保存 nil 即可
 		if err != nil {
 			robotsMap[parsedUrl.Host] = nil

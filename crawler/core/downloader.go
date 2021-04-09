@@ -1,5 +1,5 @@
 // 网页下载器
-package downloader
+package core
 
 import (
 	"compress/gzip"

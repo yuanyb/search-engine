@@ -20,13 +20,13 @@ var (
 
 	// 本地配置项必须提供
 	localConfigItem = [...]string{"mysql.username", "mysql.password", "mysql.host",
-		"mysql.port", "mysql.dbname"}
+		"mysql.port", "mysql.dbname", "redis.server", "indexer.server"}
 
 	LocalConfig   = loadLocalConfig()
 	defaultConfig = CrawlerConfig{
 		RandomInterval: false,
 		Interval:       3000,
-		Suspend:        false,
+		Suspend:        true,
 		Timeout:        10000,
 		RetryCount:     3,
 		Useragent:      "qut_spider",
