@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
-	"strings"
 )
 
 type ConfigDB struct {
@@ -38,7 +37,7 @@ func NewConfigDB(options *ConfigDBOptions) *ConfigDB {
 		panic("数据库错误：" + err.Error())
 	}
 
-	configDB.getIllegalKeywords, err = db.Prepare("select `illegal_keywords` from `search_engine_illegal_keyword` limit 1")
+	configDB.getIllegalKeywords, err = db.Prepare("select `illegal_keyword` from `search_engine_illegal_keyword`")
 	if err != nil {
 		panic("数据库错误：" + err.Error())
 	}
@@ -63,11 +62,18 @@ func (db *ConfigDB) GetConfig() (map[string]string, error) {
 }
 
 func (db ConfigDB) GetIllegalKeyWords() ([]string, error) {
-	var value string
-	err := db.getIllegalKeywords.QueryRow().Scan(&value)
-	ret := strings.Split(strings.TrimSpace(value), "|")
-	for i := range ret {
-		ret[i] = strings.TrimSpace(ret[i])
+	var illegalKeywords []string
+	var w string
+	rows, err := db.getIllegalKeywords.Query()
+	if err != nil {
+		return nil, err
 	}
-	return ret, err
+	for rows.Next() {
+		err = rows.Scan(&w)
+		if err != nil {
+			return nil, err
+		}
+		illegalKeywords = append(illegalKeywords, w)
+	}
+	return illegalKeywords, err
 }

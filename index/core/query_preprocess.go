@@ -25,21 +25,23 @@ func init() {
 		Port:     config.GetInt("mysql.port"),
 		DBName:   config.Get("mysql.dbname"),
 	})
-	illegal, err := configDB.GetIllegalKeyWords()
-	if err != nil {
-		// todo log
-	}
-	illegalKeywords = illegal
+	initialized := false
+	initDone := make(chan struct{})
 	go func() {
-		time.Sleep(time.Minute)
-		illegal, err = configDB.GetIllegalKeyWords()
-		if err != nil {
-			// todo log
-		} else {
-			// 实时性要求低，不用做并发安全处理
-			illegalKeywords = illegal
+		for {
+			illegal, err := configDB.GetIllegalKeyWords()
+			if err == nil {
+				// 实时性要求低，不用做并发安全处理
+				illegalKeywords = illegal
+			}
+			if !initialized {
+				initialized = true
+				initDone <- struct{}{}
+			}
+			time.Sleep(time.Minute)
 		}
 	}()
+	<-initDone
 }
 
 func hasIllegalKeywords(query string) bool {
