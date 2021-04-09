@@ -42,6 +42,7 @@ func init() {
 		}
 	}()
 	<-initDone
+	close(initDone)
 }
 
 func hasIllegalKeywords(query string) bool {

@@ -14,8 +14,8 @@ type parsedDocument struct {
 }
 
 var (
-	titlePattern     = regexp.MustCompile(`(?im)<title.*?>(.*?)</title>`)
-	trimTagPattern   = regexp.MustCompile(`(?im)<script.*?>.*?</script>|<style.*?>.*?</style>|<title.*?>.*?</title>|<.+?>`)
+	titlePattern     = regexp.MustCompile(`(?ism)<title.*?>(.*?)</title>`)
+	trimTagPattern   = regexp.MustCompile(`(?ism)<script.*?>.*?</script>|<style.*?>.*?</style>|<title.*?>.*?</title>|<.+?>`)
 	trimSpacePattern = regexp.MustCompile(`(?m)\s+`)
 )
 
@@ -26,7 +26,7 @@ func parseDocument(document string) *parsedDocument {
 	if len(result) == 0 {
 		return nil
 	}
-	parsedDocument.title = result[1]
+	parsedDocument.title = strings.TrimSpace(result[1])
 
 	// body
 	document = trimTagPattern.ReplaceAllString(document, " ")

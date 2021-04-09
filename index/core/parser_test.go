@@ -7,7 +7,8 @@ func TestParseDocument(t *testing.T) {
 <!DOCTYPE html>
 <html>
 	<head>
-		<title lang="xxx">==title==</title>
+		<title lang="xxx">==title==
+</title>
 		<style> css </style>
 	</head>
 	<body>
