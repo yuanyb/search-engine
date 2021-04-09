@@ -13,11 +13,18 @@ type ConfigDB struct {
 	getIllegalKeywords *sql.Stmt
 }
 
-var GlobalConfigDB = newConfigDB()
+type ConfigDBOptions struct {
+	User     string
+	Password string
+	Host     string
+	Port     int
+	DBName   string
+}
 
-func newConfigDB() *ConfigDB {
+func NewConfigDB(options *ConfigDBOptions) *ConfigDB {
 	configDB := &ConfigDB{}
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", "root", "root", "localhost", "3306", "search-engine-config")
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8",
+		options.User, options.Password, options.Host, options.Port, options.DBName)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		panic("数据库错误：" + err.Error())
@@ -26,7 +33,7 @@ func newConfigDB() *ConfigDB {
 		panic("数据库错误：" + err.Error())
 	}
 
-	configDB.getConfig, err = db.Prepare("select `value` from `search_engine_indexer` where `name` = ?")
+	configDB.getConfig, err = db.Prepare("select * from `search_engine_indexer`")
 	if err != nil {
 		panic("数据库错误：" + err.Error())
 	}
@@ -38,15 +45,26 @@ func newConfigDB() *ConfigDB {
 	return configDB
 }
 
-func (db *ConfigDB) GetConfig(name string) (string, error) {
-	var value string
-	err := db.getConfig.QueryRow(name).Scan(&value)
-	return value, err
+func (db *ConfigDB) GetConfig() (map[string]string, error) {
+	conf := make(map[string]string)
+	rows, err := db.getConfig.Query()
+	if err != nil {
+		return conf, err
+	}
+	var name, value string
+	for rows.Next() {
+		err = rows.Scan(&name, &value)
+		if err != nil {
+			return conf, err
+		}
+		conf[name] = value
+	}
+	return conf, err
 }
 
 func (db ConfigDB) GetIllegalKeyWords() ([]string, error) {
 	var value string
-	err := db.getConfig.QueryRow().Scan(&value)
+	err := db.getIllegalKeywords.QueryRow().Scan(&value)
 	ret := strings.Split(strings.TrimSpace(value), "|")
 	for i := range ret {
 		ret[i] = strings.TrimSpace(ret[i])

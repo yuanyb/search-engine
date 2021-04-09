@@ -2,6 +2,7 @@
 package core
 
 import (
+	"search-engine/index/config"
 	"search-engine/index/db"
 	"strings"
 	"time"
@@ -17,14 +18,21 @@ var illegalKeywords []string
 
 // 定时从数据库中抓取非法关键词
 func init() {
-	illegal, err := db.GlobalConfigDB.GetIllegalKeyWords()
+	configDB := db.NewConfigDB(&db.ConfigDBOptions{
+		User:     config.Get("mysql.user"),
+		Password: config.Get("mysql.password"),
+		Host:     config.Get("mysql.host"),
+		Port:     config.GetInt("mysql.port"),
+		DBName:   config.Get("mysql.dbname"),
+	})
+	illegal, err := configDB.GetIllegalKeyWords()
 	if err != nil {
 		// todo log
 	}
 	illegalKeywords = illegal
 	go func() {
 		time.Sleep(time.Minute)
-		illegal, err = db.GlobalConfigDB.GetIllegalKeyWords()
+		illegal, err = configDB.GetIllegalKeyWords()
 		if err != nil {
 			// todo log
 		} else {

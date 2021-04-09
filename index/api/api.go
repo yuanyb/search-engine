@@ -24,12 +24,12 @@ type Response struct {
 	Data interface{} `json:"data"`
 }
 
-func Serve(port uint) {
+func Serve(port int) {
 	engine = core.NewEngine()
 	http.HandleFunc("/search", searchHandler)
 	// 该接口不因该暴露出去
 	http.HandleFunc("/index", indexHandler)
-	err := http.ListenAndServe(":"+strconv.Itoa(int(port)), nil)
+	err := http.ListenAndServe(":"+strconv.Itoa(port), nil)
 	log.Fatal(err)
 }
 

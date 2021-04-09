@@ -1,12 +1,10 @@
 package main
 
 import (
-	"flag"
 	"search-engine/index/api"
+	"search-engine/index/config"
 )
 
 func main() {
-	port := flag.Uint("p", 8888, "-p port")
-	flag.Parsed()
-	api.Serve(*port)
+	api.Serve(config.GetInt("port"))
 }

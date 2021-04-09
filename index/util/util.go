@@ -2,6 +2,7 @@ package util
 
 import (
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -39,4 +40,22 @@ func UrlToHost(u string) string {
 		host = host[:p]
 	}
 	return host
+}
+
+func ToInt(dest *int, value string) {
+	if i, err := strconv.ParseInt(value, 10, 64); err == nil {
+		*dest = int(i)
+	}
+}
+
+func ToInt64(dest *int64, value string) {
+	if i, err := strconv.ParseInt(value, 10, 64); err == nil {
+		*dest = i
+	}
+}
+
+func ToBool(dest *bool, value string) {
+	if b, err := strconv.ParseBool(value); err == nil {
+		*dest = b
+	}
 }

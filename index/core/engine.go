@@ -15,35 +15,34 @@ type Engine struct {
 	searcher      *searcher
 	db            *db.IndexDB
 
-	indexerChannels  []chan [2]string
-	indexWorkerCount int
+	indexerChannels    []chan [2]string
+	indexerWorkerCount int
 }
 
 func NewEngine() *Engine {
-	conf := config.GlobalConfig
 	dbOptions := &db.IndexDBOptions{
-		DocUrlBufferSize:   conf.DocUrlBufferSize,
-		TokenIdBufferSize:  conf.TokenIdBufferSize,
-		PostingsBufferSize: conf.PostingsBufferSize,
-		DocumentDBPath:     conf.DocumentDBPath,
-		IndexDBPath:        conf.IndexDBPath,
+		DocUrlBufferSize:   config.GetInt("docUrlBufferSize"),
+		TokenIdBufferSize:  config.GetInt("tokenIdBufferSize"),
+		PostingsBufferSize: config.GetInt("postingsBufferSize"),
+		DocumentDBPath:     config.Get("documentDBPath"),
+		IndexDBPath:        config.Get("indexDBPath"),
 	}
 	indexDBb := db.NewIndexDB(dbOptions)
 	e := &Engine{
-		indexManager:     newIndexManager(indexDBb),
-		textProcessor:    newTextProcessor(conf.TokenN, indexDBb),
-		searcher:         newSearcher(indexDBb),
-		db:               indexDBb,
-		indexerChannels:  make([]chan [2]string, conf.IndexWorkerCount),
-		indexWorkerCount: conf.IndexWorkerCount,
+		indexManager:       newIndexManager(indexDBb),
+		textProcessor:      newTextProcessor(2, indexDBb),
+		searcher:           newSearcher(indexDBb),
+		db:                 indexDBb,
+		indexerChannels:    make([]chan [2]string, config.GetInt("indexerWorkerCount")),
+		indexerWorkerCount: config.GetInt("indexerWorkerCount"),
 	}
 
 	for i := 0; i < len(e.indexerChannels); i++ {
-		e.indexerChannels[i] = make(chan [2]string, conf.IndexerChannelLength)
+		e.indexerChannels[i] = make(chan [2]string, config.GetInt("indexerChannelLength"))
 	}
 
 	// 启动构建索引协程，限制数量
-	for i := 0; i < e.indexWorkerCount; i++ {
+	for i := 0; i < e.indexerWorkerCount; i++ {
 		go func(i int) {
 			for {
 				doc := <-e.indexerChannels[i]
@@ -65,7 +64,7 @@ func NewEngine() *Engine {
 
 // 为一个文档构建索引
 func (e *Engine) AddDocument(url, document string) {
-	e.indexerChannels[rand.Intn(e.indexWorkerCount)] <- [2]string{url, document}
+	e.indexerChannels[rand.Intn(e.indexerWorkerCount)] <- [2]string{url, document}
 }
 
 // 并发安全
