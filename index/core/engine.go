@@ -20,14 +20,13 @@ type Engine struct {
 }
 
 func NewEngine() *Engine {
-	dbOptions := &db.IndexDBOptions{
+	indexDBb := db.NewIndexDB(&db.IndexDBOptions{
 		DocUrlBufferSize:   config.GetInt("docUrlBufferSize"),
 		TokenIdBufferSize:  config.GetInt("tokenIdBufferSize"),
 		PostingsBufferSize: config.GetInt("postingsBufferSize"),
 		DocumentDBPath:     config.Get("documentDBPath"),
 		IndexDBPath:        config.Get("indexDBPath"),
-	}
-	indexDBb := db.NewIndexDB(dbOptions)
+	})
 	e := &Engine{
 		indexManager:       newIndexManager(indexDBb),
 		textProcessor:      newTextProcessor(2, indexDBb),
