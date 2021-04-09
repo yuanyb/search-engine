@@ -38,17 +38,7 @@ func searchHandler(writer http.ResponseWriter, request *http.Request) {
 		write(writer, http.StatusMethodNotAllowed, &Response{Code: codeFail, Msg: "method not allowed"})
 		return
 	}
-	data, err := io.ReadAll(request.Body)
-	if err != nil {
-		write(writer, http.StatusInternalServerError, &Response{Code: codeFail, Msg: "internal server error"})
-		return
-	}
-	var params map[string]string
-	if err = json.Unmarshal(data, &params); err != nil {
-		write(writer, http.StatusBadRequest, &Response{Code: codeFail, Msg: "json format error"})
-		return
-	}
-	query := params["query"]
+	query := request.FormValue("query")
 	if strings.TrimSpace(query) == "" {
 		write(writer, http.StatusBadRequest, &Response{Code: codeFail, Msg: "param error"})
 		return

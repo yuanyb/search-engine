@@ -21,23 +21,23 @@ type Engine struct {
 
 func NewEngine() *Engine {
 	indexDBb := db.NewIndexDB(&db.IndexDBOptions{
-		DocUrlBufferSize:   config.GetInt("docUrlBufferSize"),
-		TokenIdBufferSize:  config.GetInt("tokenIdBufferSize"),
-		PostingsBufferSize: config.GetInt("postingsBufferSize"),
-		DocumentDBPath:     config.Get("documentDBPath"),
-		IndexDBPath:        config.Get("indexDBPath"),
+		DocUrlBufferSize:   config.GetInt("indexer.docUrlBufferSize"),
+		TokenIdBufferSize:  config.GetInt("indexer.tokenIdBufferSize"),
+		PostingsBufferSize: config.GetInt("indexer.postingsBufferSize"),
+		DocumentDBPath:     config.Get("sqlite.docPath"),
+		IndexDBPath:        config.Get("sqlite.indexPath"),
 	})
 	e := &Engine{
 		indexManager:       newIndexManager(indexDBb),
 		textProcessor:      newTextProcessor(2, indexDBb),
 		searcher:           newSearcher(indexDBb),
 		db:                 indexDBb,
-		indexerChannels:    make([]chan [2]string, config.GetInt("indexerWorkerCount")),
-		indexerWorkerCount: config.GetInt("indexerWorkerCount"),
+		indexerChannels:    make([]chan [2]string, config.GetInt("indexer.indexerWorkerCount")),
+		indexerWorkerCount: config.GetInt("indexer.indexerWorkerCount"),
 	}
 
 	for i := 0; i < len(e.indexerChannels); i++ {
-		e.indexerChannels[i] = make(chan [2]string, config.GetInt("indexerChannelLength"))
+		e.indexerChannels[i] = make(chan [2]string, config.GetInt("indexer.indexerChannelLength"))
 	}
 
 	// 启动构建索引协程，限制数量

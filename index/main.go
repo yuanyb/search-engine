@@ -6,5 +6,5 @@ import (
 )
 
 func main() {
-	api.Serve(config.GetInt("port"))
+	api.Serve(config.GetInt("indexer.port"))
 }

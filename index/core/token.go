@@ -21,9 +21,9 @@ func isIgnoredChar(char rune) bool {
 		(char >= 'A' && char <= 'Z') || // A-Z
 		(char >= 'a' && char <= 'z') || // a-z
 		(char >= '0' && char <= '9') { // 0-9
-		return true
+		return false
 	}
-	return false
+	return true
 	//_, ok := ignoreCharsSet[char]
 	//return ok
 }

@@ -55,8 +55,6 @@ func NewIndexDB(options *IndexDBOptions) *IndexDB {
 	_, err = docDB.Exec(`create table if not exists documents(
  		id integer primary key, url text not null , title text not null, body text not null)`)
 	handleDBInitError(err)
-	_, err = docDB.Exec(`create unique index title_index on documents(title)`)
-	handleDBInitError(err)
 
 	_, err = indexDB.Exec(`create table if not exists tokens(
  		id integer primary key , token text not null,
@@ -75,7 +73,7 @@ func NewIndexDB(options *IndexDBOptions) *IndexDB {
 	})
 
 	// 获取倒排列表
-	stmt, err = indexDB.Prepare("select postings from token where id = ?")
+	stmt, err = indexDB.Prepare("select postings from tokens where id = ?")
 	handleDBInitError(err)
 	db.getPostings = stmt
 	db.postingsBuffer = util.NewBuffer(options.PostingsBufferSize, func(tokenId interface{}) (interface{}, error) {
@@ -88,11 +86,11 @@ func NewIndexDB(options *IndexDBOptions) *IndexDB {
 	handleDBInitError(err)
 	db.updatePostings = stmt
 	// 文档数量
-	stmt, err = indexDB.Prepare("select count(*) from documents")
+	stmt, err = docDB.Prepare("select count(*) from documents")
 	handleDBInitError(err)
 	db.getDocumentsCount = stmt
 	// 文档URL
-	stmt, err = indexDB.Prepare("select url from documents where id = ?")
+	stmt, err = docDB.Prepare("select url from documents where id = ?")
 	handleDBInitError(err)
 	db.getDocumentUrl = stmt
 	db.docUrlBuffer = util.NewBuffer(options.DocUrlBufferSize, func(docId interface{}) (interface{}, error) {
@@ -121,6 +119,9 @@ func handleDBInitError(err error) {
 // 根据词元获取id
 func (db *IndexDB) GetTokenId(token string) (int, int, error) {
 	pair, err := db.tokenIdBuffer.Get(token)
+	if err != nil {
+		return 0, 0, err
+	}
 	arr := pair.([2]int) // tokenId,docsCount
 	return arr[0], arr[1], err
 }

@@ -19,7 +19,7 @@ var illegalKeywords []string
 // 定时从数据库中抓取非法关键词
 func init() {
 	configDB := db.NewConfigDB(&db.ConfigDBOptions{
-		User:     config.Get("mysql.user"),
+		User:     config.Get("mysql.username"),
 		Password: config.Get("mysql.password"),
 		Host:     config.Get("mysql.host"),
 		Port:     config.GetInt("mysql.port"),
