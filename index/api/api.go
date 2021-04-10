@@ -2,6 +2,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"log"
@@ -21,7 +22,7 @@ const (
 type Response struct {
 	Code int         `json:"code"`
 	Msg  string      `json:"msg,omitempty"`
-	Data interface{} `json:"data"`
+	Data interface{} `json:"data,omitempty"`
 }
 
 func Serve(port int) {
@@ -72,10 +73,14 @@ func indexHandler(writer http.ResponseWriter, request *http.Request) {
 
 func write(writer http.ResponseWriter, status int, v interface{}) {
 	writer.WriteHeader(status)
-	j, _ := json.Marshal(v)
-	n, err := writer.Write(j)
+	buf := &bytes.Buffer{}
+	encoder := json.NewEncoder(buf)
+	encoder.SetEscapeHTML(false)
+	_ = encoder.Encode(v)
+	b := buf.Bytes()
+	n, err := writer.Write(b)
 	for retryCount := 0; err != nil && retryCount < 3; retryCount++ {
-		j = j[n:]
-		n, err = writer.Write(j)
+		b = b[n:]
+		n, err = writer.Write(b)
 	}
 }

@@ -1,10 +1,6 @@
 // 分词
 package core
 
-import (
-	"unicode/utf8"
-)
-
 // 这种方式的问题是，会将其他乱七八糟的字符都建索引
 //var ignoreCharsSet = make(map[rune]struct{})
 //
@@ -31,26 +27,17 @@ func isIgnoredChar(char rune) bool {
 // n-gram 分词
 func nGramSplit(str string, n int, consumer func(token string, pos int) error) {
 	left := 0
-	for i, ch := range str {
-		chLen := utf8.RuneLen(ch)
-		_, leftChLen := utf8.DecodeRuneInString(str[left:])
+	chars := []rune(str)
+	for i, ch := range chars {
 		if isIgnoredChar(ch) {
-			if i == left {
-				left += leftChLen
-				continue
-			}
-			err := consumer(str[left:i], left)
+			left = i + 1
+			continue
+		} else if i-left+1 == n {
+			err := consumer(string(chars[left:i+1]), left)
 			if err != nil {
-				// todo
+				// todo log
 			}
-			left = i + chLen
-		}
-		if utf8.RuneCountInString(str[left:i+chLen]) == n {
-			err := consumer(str[left:i+chLen], left)
-			if err != nil {
-				// todo
-			}
-			left += leftChLen
+			left++
 		}
 	}
 }

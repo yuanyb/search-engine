@@ -7,7 +7,6 @@ import (
 )
 
 type parsedDocument struct {
-	url   string
 	title string
 	body  string
 	// h1 []string // h1标签 权重高

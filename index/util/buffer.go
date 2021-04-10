@@ -57,12 +57,11 @@ func (b *Buffer) _add(key, value interface{}) {
 	b._map[key] = e
 }
 
-//
-//func (b *buffer) _del(key interface{}) {
-//	e, ok := b._map[key]
-//	if !ok {
-//		return
-//	}
-//	b.list.Remove(e)
-//	delete(b._map, key)
-//}
+func (b *Buffer) Del(key interface{}) {
+	e, ok := b._map[key]
+	if !ok {
+		return
+	}
+	b.list.Remove(e)
+	delete(b._map, key)
+}

@@ -50,7 +50,6 @@ func newTextProcessor(n int, db *db.IndexDB) *textProcessor {
 
 func newIndexManager(db *db.IndexDB) *indexManager {
 	return &indexManager{
-		indexBuffer:          make(invertedIndex),
 		bufferFlushThreshold: 0,
 		db:                   db,
 		lock:                 sync.Mutex{},
@@ -134,6 +133,8 @@ func (i invertedIndex) merge(index invertedIndex) {
 func (p *postingsList) merge(postings *postingsList) *postingsList {
 	if postings == nil {
 		return p
+	} else if p == nil {
+		return postings
 	}
 	head := new(postingsList)
 	pc, pa, pb := head, p, postings
@@ -171,12 +172,14 @@ func (p *postingsList) encode() []byte {
 }
 
 // 将二进制数据解码成倒排列表
-func decodePostings(data []byte) *postingsList {
+func decodePostings(data []byte) (*postingsList, int) {
 	head := new(postingsList)
 	p := head
+	postingsLength := 0
 	for pos := 0; pos < len(data); {
 		p.next = new(postingsList)
 		p = p.next
+		postingsLength++
 		x, length := binary.Varint(data[pos:])
 		pos += length
 		p.documentId = int(x)
@@ -195,22 +198,24 @@ func decodePostings(data []byte) *postingsList {
 			p.positions = append(p.positions, int(x))
 		}
 	}
-	return head.next
+	return head.next, postingsLength
 }
 
 // 将 index 合并进索引管理器
 func (m *indexManager) merge(index invertedIndex) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	if m.indexBuffer == nil {
+	if len(m.indexBuffer) == 0 {
 		m.indexBuffer = index
-		return
+	} else {
+		m.indexBuffer.merge(index)
 	}
-	m.indexBuffer.merge(index)
+	m.indexCount++
 	// 缓存数量大于阈值，异步刷新到存储器
 	if m.indexCount > m.bufferFlushThreshold {
 		go flushIndex(m.indexBuffer, m.db)
 		m.indexBuffer = make(invertedIndex)
+		m.indexCount = 0
 	}
 }
 
@@ -223,12 +228,12 @@ func flushIndex(index invertedIndex, destDB *db.IndexDB) {
 			// todo log
 			continue
 		}
-		postings := decodePostings(data)
+		postings, docsCount := decodePostings(data)
 		// 内存中合并
 		postings = postings.merge(item.postings)
 		// 写回
 		data = postings.encode()
-		err = destDB.UpdatePostings(tokenId, data)
+		err = destDB.UpdatePostings(tokenId, item.documentCount+docsCount, data)
 		if err != nil {
 			// todo log
 		}

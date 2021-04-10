@@ -34,113 +34,132 @@ func (c *phraseSearchCursor) hasNextPos() bool {
 
 // 搜索结果
 type SearchResults struct {
-	Items      []searchResultItem `json:"items"`
-	Suggestion string             `json:"suggestion,omitempty"`
+	Items      []*searchResultItem `json:"items"`
+	Suggestion string              `json:"suggestion,omitempty"`
 }
 
-func (s SearchResults) Push(x interface{}) {
-	s.Items = append(s.Items, x.(searchResultItem))
+func (s *SearchResults) Push(x interface{}) {
+	s.Items = append(s.Items, x.(*searchResultItem))
 }
 
-func (s SearchResults) Pop() interface{} {
+func (s *SearchResults) Pop() interface{} {
 	ret := s.Items[len(s.Items)-1]
 	s.Items = s.Items[:len(s.Items)-1]
 	return ret
 }
 
-func (s SearchResults) Len() int { return len(s.Items) }
+func (s *SearchResults) Len() int { return len(s.Items) }
 
-func (s SearchResults) Less(i, j int) bool { return s.Items[j].score < s.Items[i].score }
+func (s *SearchResults) Less(i, j int) bool { return s.Items[j].score < s.Items[i].score }
 
-func (s SearchResults) Swap(i, j int) { s.Items[i], s.Items[j] = s.Items[j], s.Items[i] }
+func (s *SearchResults) Swap(i, j int) { s.Items[i], s.Items[j] = s.Items[j], s.Items[i] }
 
 // 结果集合 s and s2 操作
-func (s *SearchResults) and(s2 SearchResults) {
+func (s *SearchResults) and(s2 *SearchResults) {
 	if s.Items == nil {
 		s.Items = s2.Items
 		return
 	}
 	set := make(map[int]*searchResultItem)
 	for _, item := range s2.Items {
-		set[item.documentId] = &item
+		set[item.documentId] = item
 	}
-	newItems := make([]searchResultItem, 0)
+	newItems := make([]*searchResultItem, 0)
 	for _, item := range s.Items {
 		if item, ok := set[item.documentId]; ok {
-			newItems = append(newItems, *item)
+			newItems = append(newItems, item)
 		}
 	}
 	s.Items = newItems
 }
 
 // 结果集合 s not s2 操作
-func (s *SearchResults) not(s2 SearchResults) {
+func (s *SearchResults) not(s2 *SearchResults) {
 	set := make(map[int]*searchResultItem)
 	for _, item := range s2.Items {
-		set[item.documentId] = &item
+		set[item.documentId] = item
 	}
-	newItems := make([]searchResultItem, 0)
+	newItems := make([]*searchResultItem, 0)
 	for _, item := range s.Items {
 		if item, ok := set[item.documentId]; !ok {
-			newItems = append(newItems, *item)
+			newItems = append(newItems, item)
 		}
 	}
 	s.Items = newItems
 }
 
 const (
-	highlightPrefix = `<span style="color:red">`
+	highlightPrefix = `<span style='color:red'>`
 	highlightSuffix = `</span>`
 )
 
 // 获取结果信息及结果高亮
 func (s *SearchResults) applyHighlight(db *db.IndexDB) {
 	items := s.Items
-	for i := range items {
-		bh := items[i].bodyHighlight
-		start, length := bh[0][0], bh[len(bh)][1]-bh[0][0]+1
-		if padding := (100 - length + 1) / 2; start-padding < 0 {
-			length += padding - start
-			start = 0
-		}
-		url, title, abstract, err := db.GetDocumentDetail(items[i].documentId, start, length)
+	for _, item := range items {
+		url, title0, body0, err := db.GetDocumentDetail(item.documentId)
 		if err != nil {
-			items[i].documentId = -1 // 删除这个结果项
+			item.documentId = -1 // 删除这个结果项
 			continue
 		}
-		items[i].Url = url
-		// title插入高亮标签
+		title, body := []rune(title0), []rune(body0)
+
+		item.Url = url
+
 		builder := &strings.Builder{}
 		var pos int
-		// title:abcd1234  h:{{2,3}, {5,6}}  =>  ab <span...> cd </span> 1 <span...> 12 </span> 34
-		for _, h := range items[i].titleHighlight {
-			builder.WriteString(title[pos:h[0]])
-			builder.WriteString(highlightPrefix)
-			builder.WriteString(title[h[0] : h[1]+1])
-			builder.WriteString(highlightSuffix)
-			pos = h[1] + 1
+		// body 插入高亮标签
+		if bh := item.bodyHighlight; len(bh) > 0 {
+			// 计算网页摘要的区间
+			start, end := bh[0][0], bh[len(bh)-1][1]
+			padding := (100 - (end - start + 1)) / 2
+			start = util.MaxInt(start-padding, 0)
+			if start-padding >= 0 {
+				end = util.MinInt(len(body), end+padding)
+			} else {
+				end = util.MinInt(len(body), end+padding-start)
+			}
+			abstract := body[start:end]
+			for _, h := range item.bodyHighlight {
+				h[0], h[1] = h[0]-start, h[1]-start
+				builder.WriteString(string(abstract[pos:h[0]]))
+				builder.WriteString(highlightPrefix)
+				builder.WriteString(string(abstract[h[0] : h[1]+1]))
+				builder.WriteString(highlightSuffix)
+				pos = h[1] + 1
+			}
+			// 剩余的字符串
+			builder.WriteString(string(abstract[pos:]))
+			item.Abstract = builder.String()
+		} else {
+			item.Abstract = body0[:100]
 		}
-		items[i].Title = builder.String()
-		// body插入高亮标签
-		builder.Reset()
-		pos = 0
-		for _, h := range items[i].bodyHighlight {
-			h[0], h[1] = h[0]-start, h[1]-start
-			builder.WriteString(abstract[pos:h[0]])
-			builder.WriteString(highlightPrefix)
-			builder.WriteString(abstract[h[0] : h[1]+1])
-			builder.WriteString(highlightSuffix)
-			pos = h[1] + 1
+		// title 插入高亮标签
+		if len(item.titleHighlight) > 0 {
+			// title:abcd1234  h:{{2,3}, {5,6}}  =>  ab <span...> cd </span> 1 <span...> 12 </span> 34
+			builder.Reset()
+			pos = 0
+			for _, h := range item.titleHighlight {
+				builder.WriteString(string(title[pos:h[0]]))
+				builder.WriteString(highlightPrefix)
+				builder.WriteString(string(title[h[0] : h[1]+1]))
+				builder.WriteString(highlightSuffix)
+				pos = h[1] + 1
+			}
+			// 剩余的字符串
+			builder.WriteString(string(title[pos:]))
+			item.Title = builder.String()
+		} else {
+			item.Title = title0
 		}
-		items[i].Abstract = builder.String()
 	}
 
-	var newItems []searchResultItem
-	for i := range items {
-		if items[i].documentId == -1 {
+	var newItems []*searchResultItem
+	for _, item := range items {
+		if item.documentId == -1 {
 			continue
 		}
-		newItems = append(newItems, items[i])
+		newItems = append(newItems, item)
 	}
 	s.Items = newItems
 }
@@ -151,9 +170,9 @@ type searchResultItem struct {
 	titleHighlight [][2]int // 结果高亮
 	bodyHighlight  [][2]int
 	// 返回的数据
-	Url      string
-	Title    string
-	Abstract string
+	Url      string `json:"url"`
+	Title    string `json:"title"`
+	Abstract string `json:"abstract"`
 }
 
 func newSearcher(db *db.IndexDB) *searcher {
@@ -164,7 +183,10 @@ func newSearcher(db *db.IndexDB) *searcher {
 
 // 检索文档
 // 没必要返回和在内存中保存全部结果，因为使用者也看不了那么多结果
-func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) SearchResults {
+func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) *SearchResults {
+	if len(queryTokens) == 0 {
+		return &SearchResults{}
+	}
 	// 将 queryToken 按文档数量升序排序，这样可以尽早结束比较
 	sort.Slice(queryTokens, func(i, j int) bool {
 		return queryTokens[i].documentCount < queryTokens[j].documentCount
@@ -175,22 +197,22 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) Search
 	for i, item := range queryTokens {
 		// 词元 i 还没有建过索引
 		if item == nil {
-			return SearchResults{}
+			return &SearchResults{}
 		}
 		data, err := s.db.GetPostings(item.tokenId)
 		if err != nil {
 			// todo log
-			return SearchResults{}
+			return &SearchResults{}
 		}
-		postings := decodePostings(data)
+		postings, _ := decodePostings(data)
 		// 词元 i 没有倒排列表
 		if postings == nil {
-			return SearchResults{}
+			return &SearchResults{}
 		}
 		cursors[i] = postings
 	}
 
-	results := SearchResults{Items: make([]searchResultItem, 50)}
+	results := &SearchResults{Items: make([]*searchResultItem, 0)}
 	heap.Init(results)
 
 	// 检索候选文档，以第一个词元的倒排列表（最短）为基准
@@ -204,7 +226,7 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) Search
 			}
 			// cursors[i] 中的所有文档id都小于baseDocId，则不可能有结果
 			if cursors[i] == nil {
-				return SearchResults{}
+				return &SearchResults{}
 			}
 			if cursors[i].documentId > baseDocId {
 				nextDocId = cursors[i].documentId
@@ -228,7 +250,7 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) Search
 		item := &searchResultItem{documentId: baseDocId}
 		searchTitleOrBody := func(inTitle bool) {
 			// 进行短语搜索
-			phraseCount, highLight := searchPhrase(queryTokens, cursors, true)
+			phraseCount, highLight := searchPhrase(queryTokens, cursors, inTitle)
 			// 打分
 			docsCount, err := s.db.GetDocumentsCount()
 			if err != nil {
@@ -273,6 +295,7 @@ func searchPhrase(queryTokens []*tokenIndexItem, docCursors []docSearchCursor, i
 	cursorPos := 0
 	for i, item := range queryTokens {
 		// query:aba123，这个查询中，a出现了两次，a对应item的positions就是 {0,2}
+		// queryTokens[i] 和 docCursors[i] 是一一对应的
 		for _, pos := range item.postings.positions {
 			cursors[cursorPos].base = pos
 			if inTitle {
@@ -318,23 +341,24 @@ func searchPhrase(queryTokens []*tokenIndexItem, docCursors []docSearchCursor, i
 			// 找到了短语
 			phraseCount++
 			cursors[0].curIdx++
-			// 记住位置
-			highLight = append(highLight, [2]int{offset, maxNextOffset + 1})
 		}
 	}
-	if len(highLight) == 0 {
-		highLight = append(highLight, findHighLight(cursors)...)
-	}
+	highLight = findHighlight(cursors)
 	return phraseCount, highLight
 }
 
 // 构造高亮区间
-func findHighLight(cursors []phraseSearchCursor) [][2]int {
-	// 重置 curIdx
+func findHighlight(cursors []phraseSearchCursor) [][2]int {
 	length := 0
+	// 重置 curIdx
 	for i := range cursors {
 		cursors[i].curIdx = 0
 		length += len(cursors[i].positions)
+	}
+	// 如果词元仅在标题（文档）中，而 findHighlight 又都会尝试查找，
+	// 由于位置信息为空导致 intervals 为空，继续执行下面代码就会导致切片溢出 panic
+	if length == 0 {
+		return nil
 	}
 	// 将位置信息转换成区间信息
 	intervals := make([][2]int, 0, length)

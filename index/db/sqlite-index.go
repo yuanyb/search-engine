@@ -15,6 +15,7 @@ type IndexDB struct {
 	indexDB    *sql.DB
 
 	getTokenId        *sql.Stmt
+	addToken          *sql.Stmt
 	tokenIdBuffer     *util.Buffer
 	getPostings       *sql.Stmt
 	postingsBuffer    *util.Buffer
@@ -62,15 +63,31 @@ func NewIndexDB(options *IndexDBOptions) *IndexDB {
 	handleDBInitError(err)
 	_, err = docDB.Exec(`create unique index token_index on tokens(token)`)
 
-	// 初始化语句
+	// 查询token
 	stmt, err := indexDB.Prepare("select id, docs_count from tokens where token = ?")
 	handleDBInitError(err)
 	db.getTokenId = stmt
 	db.tokenIdBuffer = util.NewBuffer(options.TokenIdBufferSize, func(token interface{}) (interface{}, error) {
 		var tokenId, docsCount int
 		err := db.getTokenId.QueryRow(token).Scan(&tokenId, &docsCount)
-		return [2]int{tokenId, docsCount}, err
+		// 该词元不存在
+		if err == sql.ErrNoRows {
+			res, err2 := db.addToken.Exec(token)
+			if err2 != nil {
+				return nil, err2
+			}
+			id, err2 := res.LastInsertId()
+			if err2 != nil {
+				return nil, err2
+			}
+			tokenId = int(id)
+		}
+		return [2]int{tokenId, docsCount}, nil
 	})
+
+	stmt, err = indexDB.Prepare("insert into tokens(token) values(?)")
+	handleDBInitError(err)
+	db.addToken = stmt
 
 	// 获取倒排列表
 	stmt, err = indexDB.Prepare("select postings from tokens where id = ?")
@@ -82,7 +99,10 @@ func NewIndexDB(options *IndexDBOptions) *IndexDB {
 		return v, err
 	})
 	// 修改倒排列表
-	stmt, err = indexDB.Prepare("replace into tokens(id, postings) values(?, ?)")
+
+	// 之前已经查如果token了，但 token 设置为了 not null，如果不提供一个token就会语法错误
+	stmt, err = indexDB.Prepare(`insert into tokens(id, token, docs_count, postings)
+	 values(?, "", ?, ?) on conflict(id) do update set docs_count=?, postings=?`)
 	handleDBInitError(err)
 	db.updatePostings = stmt
 	// 文档数量
@@ -103,7 +123,7 @@ func NewIndexDB(options *IndexDBOptions) *IndexDB {
 	handleDBInitError(err)
 	db.addDocument = stmt
 	// 标题、摘要
-	stmt, err = docDB.Prepare("select url, title, substr(body, ?, ?) from documents where id = ?")
+	stmt, err = docDB.Prepare("select url, title, body from documents where id = ?")
 	handleDBInitError(err)
 	db.getDocumentDetail = stmt
 
@@ -123,7 +143,7 @@ func (db *IndexDB) GetTokenId(token string) (int, int, error) {
 		return 0, 0, err
 	}
 	arr := pair.([2]int) // tokenId,docsCount
-	return arr[0], arr[1], err
+	return arr[0], arr[1], nil
 }
 
 // 获取词元的倒排列表
@@ -133,8 +153,9 @@ func (db *IndexDB) GetPostings(tokenId int) ([]byte, error) {
 }
 
 // 修改指定词元的倒排列表
-func (db *IndexDB) UpdatePostings(tokenId int, data []byte) error {
-	_, err := db.updatePostings.Exec(tokenId, data, data)
+func (db *IndexDB) UpdatePostings(tokenId, docsCount int, data []byte) error {
+	_, err := db.updatePostings.Exec(tokenId, docsCount, data, docsCount, data)
+	db.postingsBuffer.Del(tokenId) // 删除旧的
 	return err
 }
 
@@ -172,9 +193,9 @@ func (db *IndexDB) AddDocument(url, title, body string) (int, error) {
 	return int(docId), err
 }
 
-func (db *IndexDB) GetDocumentDetail(docId, start, length int) (string, string, string, error) {
+func (db *IndexDB) GetDocumentDetail(docId int) (string, string, string, error) {
 	var url, title, abstract string
 	// sqlite substr 起始位置是1
-	err := db.getDocumentDetail.QueryRow(start+1, length, docId).Scan(&url, &title, &abstract)
+	err := db.getDocumentDetail.QueryRow(docId).Scan(&url, &title, &abstract)
 	return url, title, abstract, err
 }
