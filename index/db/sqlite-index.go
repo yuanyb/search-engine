@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	_ "github.com/mattn/go-sqlite3"
+	"log"
 	"search-engine/index/util"
 	"sync"
 	"sync/atomic"
@@ -140,6 +141,7 @@ func handleDBInitError(err error) {
 func (db *IndexDB) GetTokenId(token string) (int, int, error) {
 	pair, err := db.tokenIdBuffer.Get(token)
 	if err != nil {
+		log.Println(err.Error())
 		return 0, 0, err
 	}
 	arr := pair.([2]int) // tokenId,docsCount
@@ -187,7 +189,8 @@ func (db *IndexDB) GetDocUrl(id int) (string, error) {
 func (db *IndexDB) AddDocument(url, title, body string) (int, error) {
 	res, err := db.addDocument.Exec(url, title, body)
 	if err != nil {
-		return 0, nil
+		log.Println(err.Error())
+		return 0, err
 	}
 	docId, err := res.LastInsertId()
 	return int(docId), err

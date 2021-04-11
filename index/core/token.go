@@ -1,6 +1,8 @@
 // 分词
 package core
 
+import "log"
+
 // 这种方式的问题是，会将其他乱七八糟的字符都建索引
 //var ignoreCharsSet = make(map[rune]struct{})
 //
@@ -35,7 +37,7 @@ func nGramSplit(str string, n int, consumer func(token string, pos int) error) {
 		} else if i-left+1 == n {
 			err := consumer(string(chars[left:i+1]), left)
 			if err != nil {
-				// todo log
+				log.Println(err.Error())
 			}
 			left++
 		}

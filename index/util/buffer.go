@@ -3,6 +3,7 @@ package util
 
 import (
 	"container/list"
+	"log"
 	"sync"
 )
 
@@ -37,7 +38,7 @@ func (b *Buffer) Get(key interface{}) (interface{}, error) {
 	if !ok {
 		v, err := b.getFunc(key)
 		if err != nil {
-			// todo log
+			log.Println(err.Error())
 			return nil, err
 		}
 		b._add(key, v)

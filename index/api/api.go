@@ -10,6 +10,7 @@ import (
 	"search-engine/index/core"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var engine *core.Engine
@@ -44,7 +45,9 @@ func searchHandler(writer http.ResponseWriter, request *http.Request) {
 		write(writer, http.StatusBadRequest, &Response{Code: codeFail, Msg: "param error"})
 		return
 	}
+	start := time.Now()
 	searchResults := engine.Search(query)
+	searchResults.Duration = time.Now().Sub(start).Milliseconds()
 	write(writer, http.StatusOK, searchResults)
 }
 
@@ -55,11 +58,13 @@ func indexHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 	data, err := io.ReadAll(request.Body)
 	if err != nil {
+		log.Println(err.Error())
 		write(writer, http.StatusInternalServerError, &Response{Code: codeFail, Msg: "internal server error"})
 		return
 	}
 	var params map[string]string
 	if err = json.Unmarshal(data, &params); err != nil {
+		log.Println(err.Error())
 		write(writer, http.StatusBadRequest, &Response{Code: codeFail, Msg: "json format error"})
 		return
 	}
