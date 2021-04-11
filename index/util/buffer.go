@@ -59,6 +59,8 @@ func (b *Buffer) _add(key, value interface{}) {
 }
 
 func (b *Buffer) Del(key interface{}) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	e, ok := b._map[key]
 	if !ok {
 		return
