@@ -51,8 +51,9 @@ func (b *Buffer) Get(key interface{}) (interface{}, error) {
 
 func (b *Buffer) _add(key, value interface{}) {
 	if b.list.Len() >= b.maxSize {
-		e := b.list.Remove(b.list.Back())
-		delete(b._map, e.(*node).key)
+		back := b.list.Back()
+		b.list.Remove(back)
+		delete(b._map, back.Value.(*node).key)
 	}
 	e := b.list.PushFront(&node{key, value})
 	b._map[key] = e
