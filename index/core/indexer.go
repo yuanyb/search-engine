@@ -49,9 +49,9 @@ func newTextProcessor(n int, db *db.IndexDB) *textProcessor {
 	}
 }
 
-func newIndexManager(db *db.IndexDB) *indexManager {
+func newIndexManager(db *db.IndexDB, bufferFlushThreshold int) *indexManager {
 	return &indexManager{
-		bufferFlushThreshold: 0,
+		bufferFlushThreshold: bufferFlushThreshold,
 		db:                   db,
 		lock:                 sync.Mutex{},
 	}

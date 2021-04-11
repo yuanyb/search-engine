@@ -29,7 +29,7 @@ func NewEngine() *Engine {
 		IndexDBPath:        config.Get("sqlite.indexPath"),
 	})
 	e := &Engine{
-		indexManager:       newIndexManager(indexDBb),
+		indexManager:       newIndexManager(indexDBb, config.GetInt("indexer.postingsBufferFlushThreshold")),
 		textProcessor:      newTextProcessor(2, indexDBb),
 		searcher:           newSearcher(indexDBb),
 		db:                 indexDBb,
