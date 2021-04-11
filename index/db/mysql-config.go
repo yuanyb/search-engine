@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
+	"log"
 )
 
 type ConfigDB struct {
@@ -48,12 +49,14 @@ func (db *ConfigDB) GetConfig() (map[string]string, error) {
 	conf := make(map[string]string)
 	rows, err := db.getConfig.Query()
 	if err != nil {
+		log.Print(err.Error())
 		return conf, err
 	}
 	var name, value string
 	for rows.Next() {
 		err = rows.Scan(&name, &value)
 		if err != nil {
+			log.Print(err.Error())
 			return conf, err
 		}
 		conf[name] = value
@@ -66,11 +69,13 @@ func (db ConfigDB) GetIllegalKeyWords() ([]string, error) {
 	var w string
 	rows, err := db.getIllegalKeywords.Query()
 	if err != nil {
+		log.Print(err.Error())
 		return nil, err
 	}
 	for rows.Next() {
 		err = rows.Scan(&w)
 		if err != nil {
+			log.Print(err.Error())
 			return nil, err
 		}
 		illegalKeywords = append(illegalKeywords, w)

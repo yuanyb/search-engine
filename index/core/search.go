@@ -3,6 +3,7 @@ package core
 
 import (
 	"container/heap"
+	"log"
 	"math"
 	"search-engine/index/db"
 	"search-engine/index/util"
@@ -36,6 +37,7 @@ func (c *phraseSearchCursor) hasNextPos() bool {
 type SearchResults struct {
 	Items      []*searchResultItem `json:"items"`
 	Suggestion string              `json:"suggestion,omitempty"`
+	Duration   int64               `json:"duration"` //  搜索耗时，毫秒
 }
 
 func (s *SearchResults) Push(x interface{}) {
@@ -100,6 +102,7 @@ func (s *SearchResults) applyHighlight(db *db.IndexDB) {
 		url, title0, body0, err := db.GetDocumentDetail(item.documentId)
 		if err != nil {
 			item.documentId = -1 // 删除这个结果项
+			log.Print(err.Error())
 			continue
 		}
 		title, body := []rune(title0), []rune(body0)
@@ -201,7 +204,7 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) *Searc
 		}
 		data, err := s.db.GetPostings(item.tokenId)
 		if err != nil {
-			// todo log
+			log.Print(err.Error())
 			return &SearchResults{}
 		}
 		postings, _ := decodePostings(data)
@@ -254,7 +257,7 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) *Searc
 			// 打分
 			docsCount, err := s.db.GetDocumentsCount()
 			if err != nil {
-				// todo log
+				log.Print(err.Error())
 			}
 			score := calcTfIdf(queryTokens, cursors, docsCount)
 			if phraseCount > 0 {
