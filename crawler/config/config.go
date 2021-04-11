@@ -85,7 +85,7 @@ func init() {
 	if err = db.Ping(); err != nil {
 		panic(err)
 	}
-	if stmt, err = db.Prepare("select `name`, `value` from `search-engine-crawler`"); err != nil {
+	if stmt, err = db.Prepare("select `name`, `value` from `search-engine-config`"); err != nil {
 		panic(err)
 	}
 
