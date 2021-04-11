@@ -132,7 +132,9 @@ func (s *SearchResults) applyHighlight(db *db.IndexDB) {
 				pos = h[1] + 1
 			}
 			// 剩余的字符串
-			builder.WriteString(string(abstract[pos:]))
+			if pos < len(abstract) {
+				builder.WriteString(string(abstract[pos:]))
+			}
 			item.Abstract = builder.String()
 		} else {
 			item.Abstract = body0[:100]
@@ -150,7 +152,9 @@ func (s *SearchResults) applyHighlight(db *db.IndexDB) {
 				pos = h[1] + 1
 			}
 			// 剩余的字符串
-			builder.WriteString(string(title[pos:]))
+			if pos < len(title) {
+				builder.WriteString(string(title[pos:]))
+			}
 			item.Title = builder.String()
 		} else {
 			item.Title = title0
