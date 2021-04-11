@@ -58,13 +58,13 @@ func indexHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 	data, err := io.ReadAll(request.Body)
 	if err != nil {
-		log.Print(err.Error())
+		log.Println(err.Error())
 		write(writer, http.StatusInternalServerError, &Response{Code: codeFail, Msg: "internal server error"})
 		return
 	}
 	var params map[string]string
 	if err = json.Unmarshal(data, &params); err != nil {
-		log.Print(err.Error())
+		log.Println(err.Error())
 		write(writer, http.StatusBadRequest, &Response{Code: codeFail, Msg: "json format error"})
 		return
 	}

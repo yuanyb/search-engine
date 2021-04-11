@@ -102,7 +102,7 @@ func (s *SearchResults) applyHighlight(db *db.IndexDB) {
 		url, title0, body0, err := db.GetDocumentDetail(item.documentId)
 		if err != nil {
 			item.documentId = -1 // 删除这个结果项
-			log.Print(err.Error())
+			log.Println(err.Error())
 			continue
 		}
 		title, body := []rune(title0), []rune(body0)
@@ -204,7 +204,7 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) *Searc
 		}
 		data, err := s.db.GetPostings(item.tokenId)
 		if err != nil {
-			log.Print(err.Error())
+			log.Println(err.Error())
 			return &SearchResults{}
 		}
 		postings, _ := decodePostings(data)
@@ -257,7 +257,7 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) *Searc
 			// 打分
 			docsCount, err := s.db.GetDocumentsCount()
 			if err != nil {
-				log.Print(err.Error())
+				log.Println(err.Error())
 			}
 			score := calcTfIdf(queryTokens, cursors, docsCount)
 			if phraseCount > 0 {

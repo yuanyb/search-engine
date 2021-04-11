@@ -52,7 +52,7 @@ func NewEngine() *Engine {
 				}
 				docId, err := e.db.AddDocument(doc[0], parsedDocument.title, parsedDocument.body)
 				if err != nil {
-					log.Print(err.Error())
+					log.Println(err.Error())
 					continue
 				}
 				index := e.textProcessor.textToInvertedIndex(docId, parsedDocument)

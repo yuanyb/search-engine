@@ -38,7 +38,7 @@ func (b *Buffer) Get(key interface{}) (interface{}, error) {
 	if !ok {
 		v, err := b.getFunc(key)
 		if err != nil {
-			log.Print(err.Error())
+			log.Println(err.Error())
 			return nil, err
 		}
 		b._add(key, v)

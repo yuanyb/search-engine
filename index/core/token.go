@@ -37,7 +37,7 @@ func nGramSplit(str string, n int, consumer func(token string, pos int) error) {
 		} else if i-left+1 == n {
 			err := consumer(string(chars[left:i+1]), left)
 			if err != nil {
-				log.Print(err.Error())
+				log.Println(err.Error())
 			}
 			left++
 		}

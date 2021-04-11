@@ -85,7 +85,7 @@ func (p *textProcessor) queryToTokens(query string) []*tokenIndexItem {
 func (p *textProcessor) tokenToPostingsLists(index invertedIndex, documentId int, token string, pos int, isTitle bool) error {
 	tokenId, docsCount, err := p.db.GetTokenId(token)
 	if err != nil {
-		log.Print(err.Error())
+		log.Println(err.Error())
 		return err
 	}
 	item, ok := index[tokenId]
@@ -227,7 +227,7 @@ func flushIndex(index invertedIndex, destDB *db.IndexDB) {
 		// 从数据库中取出来旧的索引
 		data, err := destDB.GetPostings(tokenId)
 		if err != nil {
-			log.Print(err.Error())
+			log.Println(err.Error())
 			continue
 		}
 		postings, docsCount := decodePostings(data)
@@ -237,7 +237,7 @@ func flushIndex(index invertedIndex, destDB *db.IndexDB) {
 		data = postings.encode()
 		err = destDB.UpdatePostings(tokenId, item.documentCount+docsCount, data)
 		if err != nil {
-			log.Print(err.Error())
+			log.Println(err.Error())
 		}
 	}
 }
