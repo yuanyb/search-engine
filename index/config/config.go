@@ -10,9 +10,10 @@ import (
 
 // 本地配置项必须提供
 var localConfigItem = [...]string{"mysql.username", "mysql.password", "mysql.host",
-	"mysql.port", "mysql.dbname", "sqlite.indexPath", "sqlite.docPath", "indexer.port",
-	"redis.addr", "indexer.docUrlBufferSize", "indexer.tokenIdBufferSize", "indexer.postingsBufferSize",
-	"indexer.indexerWorkerCount", "indexer.indexerChannelLength", "indexer.postingsBufferFlushThreshold"}
+	"mysql.port", "mysql.dbname", "boltdb.indexPath", "boltdb.docPath", "indexer.port",
+	"indexer.docUrlBufferSize", "indexer.postingsBufferSize", "indexer.indexWorkerCount",
+	"indexer.indexChannelLength", "indexer.mergeChannelLength", "indexer.flushChannelLength",
+	"indexer.flushWorkerCount", "indexer.postingsBufferFlushThreshold", "redis.addr"}
 
 var config map[string]string
 

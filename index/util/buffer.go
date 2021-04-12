@@ -3,11 +3,10 @@ package util
 
 import (
 	"container/list"
-	"log"
 	"sync"
 )
 
-type getFunc = func(interface{}) (interface{}, error)
+type getFunc = func(interface{}) interface{}
 
 // lru
 type Buffer struct {
@@ -31,22 +30,18 @@ func NewBuffer(size int, getFunc getFunc) *Buffer {
 	}
 }
 
-func (b *Buffer) Get(key interface{}) (interface{}, error) {
+func (b *Buffer) Get(key interface{}) interface{} {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	e, ok := b._map[key]
 	if !ok {
-		v, err := b.getFunc(key)
-		if err != nil {
-			log.Println(err.Error())
-			return nil, err
-		}
+		v := b.getFunc(key)
 		b._add(key, v)
-		return v, nil
+		return v
 	}
 	b.list.Remove(e)
 	b.list.PushFront(e)
-	return e.Value.(*node).value, nil
+	return e.Value.(*node).value
 }
 
 func (b *Buffer) _add(key, value interface{}) {

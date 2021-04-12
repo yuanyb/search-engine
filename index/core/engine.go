@@ -1,8 +1,6 @@
 package core
 
 import (
-	"log"
-	"math/rand"
 	"search-engine/index/config"
 	"search-engine/index/db"
 	"strings"
@@ -11,61 +9,30 @@ import (
 const searchDocId = -1024
 
 type Engine struct {
-	indexManager  *indexManager
-	textProcessor *textProcessor
-	searcher      *searcher
-	db            *db.IndexDB
-
-	indexerChannels    []chan [2]string
-	indexerWorkerCount int
+	indexManager *indexManager
+	searcher     *searcher
+	db           *db.IndexDB
 }
 
 func NewEngine() *Engine {
-	indexDBb := db.NewIndexDB(&db.IndexDBOptions{
+	indexDB := db.NewIndexDB(&db.IndexDBOptions{
 		DocUrlBufferSize:   config.GetInt("indexer.docUrlBufferSize"),
-		TokenIdBufferSize:  config.GetInt("indexer.tokenIdBufferSize"),
 		PostingsBufferSize: config.GetInt("indexer.postingsBufferSize"),
-		DocumentDBPath:     config.Get("sqlite.docPath"),
-		IndexDBPath:        config.Get("sqlite.indexPath"),
+		DocumentDBPath:     config.Get("boltdb.docPath"),
+		IndexDBPath:        config.Get("boltdb.indexPath"),
 	})
+	tp := newTextProcessor(2, indexDB)
 	e := &Engine{
-		indexManager:       newIndexManager(indexDBb, config.GetInt("indexer.postingsBufferFlushThreshold")),
-		textProcessor:      newTextProcessor(2, indexDBb),
-		searcher:           newSearcher(indexDBb),
-		db:                 indexDBb,
-		indexerChannels:    make([]chan [2]string, config.GetInt("indexer.indexerWorkerCount")),
-		indexerWorkerCount: config.GetInt("indexer.indexerWorkerCount"),
-	}
-
-	for i := 0; i < len(e.indexerChannels); i++ {
-		e.indexerChannels[i] = make(chan [2]string, config.GetInt("indexer.indexerChannelLength"))
-	}
-
-	// 启动构建索引协程，限制数量
-	for i := 0; i < e.indexerWorkerCount; i++ {
-		go func(i int) {
-			for {
-				doc := <-e.indexerChannels[i]
-				parsedDocument := parseDocument(doc[1])
-				if parsedDocument == nil {
-					continue
-				}
-				docId, err := e.db.AddDocument(doc[0], parsedDocument.title, parsedDocument.body)
-				if err != nil {
-					log.Println(err.Error())
-					continue
-				}
-				index := e.textProcessor.textToInvertedIndex(docId, parsedDocument)
-				e.indexManager.merge(index)
-			}
-		}(i)
+		indexManager: newIndexManager(indexDB, tp, config.GetInt("indexer.postingsBufferFlushThreshold")),
+		searcher:     newSearcher(indexDB, tp),
+		db:           indexDB,
 	}
 	return e
 }
 
 // 为一个文档构建索引
 func (e *Engine) AddDocument(url, document string) {
-	e.indexerChannels[rand.Intn(e.indexerWorkerCount)] <- [2]string{url, document}
+	e.indexManager.indexChannel <- [2]string{url, document}
 }
 
 // 并发安全
@@ -84,11 +51,11 @@ func (e *Engine) Search(query string) SearchResults {
 	// 检索并合并结果
 	parsedQuery := parseQuery(query)
 	for _, keyword := range parsedQuery.keywords {
-		r := e.searcher.searchDocs(e.textProcessor.queryToTokens(keyword), parsedQuery.site)
+		r := e.searcher.searchDocs(keyword, parsedQuery.site)
 		searchResults.and(r)
 	}
 	for _, exclusion := range parsedQuery.exclusions {
-		r := e.searcher.searchDocs(e.textProcessor.queryToTokens(exclusion), parsedQuery.site)
+		r := e.searcher.searchDocs(exclusion, parsedQuery.site)
 		searchResults.not(r)
 	}
 	// 获取文档信息及高亮结果
