@@ -70,7 +70,7 @@ func parseQuery(query string) *parsedQuery {
 			if len(ret.site) > 0 {
 				break
 			}
-			ret.site = fragment
+			ret.site = fragment[5:]
 		default:
 			ret.keywords = append(ret.keywords, fragment)
 		}
