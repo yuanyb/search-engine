@@ -131,7 +131,7 @@ func (s *SearchResults) applyHighlight(db *db.IndexDB) {
 			}
 			item.Abstract = builder.String()
 		} else {
-			item.Abstract = body0[:100]
+			item.Abstract = body0[:util.MinInt(100, len(body0))]
 		}
 		// title 插入高亮标签
 		if len(item.titleHighlight) > 0 {
