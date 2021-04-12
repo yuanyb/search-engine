@@ -4,6 +4,7 @@ package util
 import (
 	"container/list"
 	"sync"
+	"time"
 )
 
 type getFunc = func(interface{}) interface{}
@@ -19,6 +20,7 @@ type Buffer struct {
 
 type node struct {
 	key, value interface{}
+	birthday   int64 // 创建这个 node 时的时间戳，避免高频 token 一直存在 Buffer 中，而得不到刷新
 }
 
 func NewBuffer(size int, getFunc getFunc) *Buffer {
@@ -34,7 +36,7 @@ func (b *Buffer) Get(key interface{}) interface{} {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	e, ok := b._map[key]
-	if !ok {
+	if !ok || time.Now().Unix()-e.Value.(*node).birthday > 60 {
 		v := b.getFunc(key)
 		b._add(key, v)
 		return v
@@ -45,12 +47,20 @@ func (b *Buffer) Get(key interface{}) interface{} {
 }
 
 func (b *Buffer) _add(key, value interface{}) {
+	if e, ok := b._map[key]; ok {
+		b.list.Remove(e)
+		delete(b._map, key)
+	}
 	if b.list.Len() >= b.maxSize {
 		back := b.list.Back()
 		b.list.Remove(back)
 		delete(b._map, back.Value.(*node).key)
 	}
-	e := b.list.PushFront(&node{key, value})
+	e := b.list.PushFront(&node{
+		key:      key,
+		value:    value,
+		birthday: time.Now().Unix(),
+	})
 	b._map[key] = e
 }
 

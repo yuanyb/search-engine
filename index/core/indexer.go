@@ -117,7 +117,7 @@ func (p *textProcessor) tokenToPostingsLists(index invertedIndex, documentId int
 		}
 		// 如果时检索时调用，则文档数量就是实际值；建索引时调用就是当前文档（个数1）
 		if documentId == searchDocId {
-			item.documentCount = p.db.GetDocumentsCount()
+			item.documentCount = p.db.GetDocsCountOfToken(token)
 		} else {
 			item.documentCount = 1
 		}

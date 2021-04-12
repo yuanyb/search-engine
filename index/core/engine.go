@@ -16,10 +16,11 @@ type Engine struct {
 
 func NewEngine() *Engine {
 	indexDB := db.NewIndexDB(&db.IndexDBOptions{
-		DocUrlBufferSize:   config.GetInt("indexer.docUrlBufferSize"),
-		PostingsBufferSize: config.GetInt("indexer.postingsBufferSize"),
-		DocumentDBPath:     config.Get("boltdb.docPath"),
-		IndexDBPath:        config.Get("boltdb.indexPath"),
+		DocUrlBufferSize:         config.GetInt("indexer.docUrlBufferSize"),
+		PostingsBufferSize:       config.GetInt("indexer.postingsBufferSize"),
+		TokenDocsCountBufferSize: config.GetInt("indexer.tokenDocCountBufferSize"),
+		DocumentDBPath:           config.Get("boltdb.docPath"),
+		IndexDBPath:              config.Get("boltdb.indexPath"),
 	})
 	tp := newTextProcessor(2, indexDB)
 	e := &Engine{
