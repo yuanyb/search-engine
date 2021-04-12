@@ -228,6 +228,9 @@ func (s *searcher) searchDocs(query, site string) *SearchResults {
 			for cursors[0] != nil && cursors[0].documentId < nextDocId {
 				cursors[0] = cursors[0].next
 			}
+			if cursors[0] == nil {
+				break
+			}
 			continue
 		}
 		// 如果该文档的URL不是指定域名下的
