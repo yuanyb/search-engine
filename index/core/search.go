@@ -3,7 +3,6 @@ package core
 
 import (
 	"container/heap"
-	"log"
 	"math"
 	"search-engine/index/db"
 	"search-engine/index/util"
@@ -12,7 +11,8 @@ import (
 )
 
 type searcher struct {
-	db *db.IndexDB
+	db            *db.IndexDB
+	textProcessor *textProcessor
 }
 
 // 文档查询游标，用于指示当前词元处理到了哪个文档
@@ -97,14 +97,8 @@ const (
 
 // 获取结果信息及结果高亮
 func (s *SearchResults) applyHighlight(db *db.IndexDB) {
-	items := s.Items
-	for _, item := range items {
-		url, title0, body0, err := db.GetDocumentDetail(item.documentId)
-		if err != nil {
-			item.documentId = -1 // 删除这个结果项
-			log.Println(err.Error())
-			continue
-		}
+	for _, item := range s.Items {
+		url, title0, body0 := db.GetDocument(item.documentId)
 		title, body := []rune(title0), []rune(body0)
 
 		item.Url = url
@@ -160,15 +154,6 @@ func (s *SearchResults) applyHighlight(db *db.IndexDB) {
 			item.Title = title0
 		}
 	}
-
-	var newItems []*searchResultItem
-	for _, item := range items {
-		if item.documentId == -1 {
-			continue
-		}
-		newItems = append(newItems, item)
-	}
-	s.Items = newItems
 }
 
 type searchResultItem struct {
@@ -182,15 +167,17 @@ type searchResultItem struct {
 	Abstract string `json:"abstract"`
 }
 
-func newSearcher(db *db.IndexDB) *searcher {
+func newSearcher(db *db.IndexDB, processor *textProcessor) *searcher {
 	return &searcher{
-		db: db,
+		db:            db,
+		textProcessor: processor,
 	}
 }
 
 // 检索文档
 // 没必要返回和在内存中保存全部结果，因为使用者也看不了那么多结果
-func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) *SearchResults {
+func (s *searcher) searchDocs(query, site string) *SearchResults {
+	queryTokens := s.textProcessor.queryToTokens(query)
 	if len(queryTokens) == 0 {
 		return &SearchResults{}
 	}
@@ -206,11 +193,7 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) *Searc
 		if item == nil {
 			return &SearchResults{}
 		}
-		data, err := s.db.GetPostings(item.tokenId)
-		if err != nil {
-			log.Println(err.Error())
-			return &SearchResults{}
-		}
+		data := s.db.FetchPostings(item.token)
 		postings, _ := decodePostings(data)
 		// 词元 i 没有倒排列表
 		if postings == nil {
@@ -249,8 +232,8 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) *Searc
 		}
 		// 如果该文档的URL不是指定域名下的
 		if site != "" {
-			u, err := s.db.GetDocUrl(baseDocId)
-			if err != nil || !strings.HasSuffix(util.UrlToHost(u), site) {
+			u := s.db.GetDocumentUrl(baseDocId)
+			if !strings.HasSuffix(util.UrlToHost(u), site) {
 				continue
 			}
 		}
@@ -259,10 +242,7 @@ func (s *searcher) searchDocs(queryTokens []*tokenIndexItem, site string) *Searc
 			// 进行短语搜索
 			phraseCount, highLight := searchPhrase(queryTokens, cursors, inTitle)
 			// 打分
-			docsCount, err := s.db.GetDocumentsCount()
-			if err != nil {
-				log.Println(err.Error())
-			}
+			docsCount := s.db.GetDocumentsCount()
 			score := calcTfIdf(queryTokens, cursors, docsCount)
 			if phraseCount > 0 {
 				// 有完整短语权重更大，只要有完整短语，score 就至少3倍，凭感觉来的

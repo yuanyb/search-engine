@@ -3,26 +3,35 @@ package core
 
 import (
 	"encoding/binary"
+	"github.com/boltdb/bolt"
 	"log"
+	"search-engine/index/config"
 	"search-engine/index/db"
-	"sync"
+	"search-engine/index/util"
 )
 
 // 索引管理器
+// indexer 					    		     			flusher
+//   ...   ---mergeChannel--> merger ---flushChannel--> ...
+// indexer											    flusher
 type indexManager struct {
+	indexChannel chan [2]string
+	flushChannel chan invertedIndex
+	mergeChannel chan invertedIndex
+
 	indexBuffer          invertedIndex // 内存中的索引，待写入磁盘
 	bufferFlushThreshold int           // 阈值
 	indexCount           int           // 当前索引的文档数量
 	db                   *db.IndexDB
-	lock                 sync.Mutex
+	textProcessor        *textProcessor
 }
 
-// 倒排索引 tokenId->tokenIndexItem
-type invertedIndex map[int]*tokenIndexItem
+// 倒排索引 token->tokenIndexItem
+type invertedIndex map[string]*tokenIndexItem
 
 // token 对应的索引项
 type tokenIndexItem struct {
-	tokenId        int           // 词元编号
+	token          string        // 词元
 	documentCount  int           // 包含该词元的文档的数目
 	positionsCount int           // 在所有文档中该词元出现的次数
 	postings       *postingsList // 该词元的倒排列表
@@ -49,12 +58,26 @@ func newTextProcessor(n int, db *db.IndexDB) *textProcessor {
 	}
 }
 
-func newIndexManager(db *db.IndexDB, bufferFlushThreshold int) *indexManager {
-	return &indexManager{
+func newIndexManager(db *db.IndexDB, textProcessor *textProcessor, bufferFlushThreshold int) *indexManager {
+	m := &indexManager{
+		indexChannel:         make(chan [2]string, config.GetInt("indexer.indexChannelLength")),
+		mergeChannel:         make(chan invertedIndex, config.GetInt("indexer.mergeChannelLength")),
+		flushChannel:         make(chan invertedIndex, config.GetInt("indexer.flushChannelLength")),
+		indexBuffer:          make(invertedIndex),
 		bufferFlushThreshold: bufferFlushThreshold,
 		db:                   db,
-		lock:                 sync.Mutex{},
+		textProcessor:        textProcessor,
 	}
+	count := config.GetInt("indexer.indexWorkerCount")
+	for i := 0; i < count; i++ {
+		go m.indexer()
+	}
+	go m.merger()
+	count = config.GetInt("indexer.flushWorkerCount")
+	for i := 0; i < count; i++ {
+		go m.flusher()
+	}
+	return m
 }
 
 func (p *textProcessor) textToInvertedIndex(documentId int, document *parsedDocument) invertedIndex {
@@ -83,29 +106,22 @@ func (p *textProcessor) queryToTokens(query string) []*tokenIndexItem {
 
 // 将一个词元转换成倒排列表
 func (p *textProcessor) tokenToPostingsLists(index invertedIndex, documentId int, token string, pos int, isTitle bool) error {
-	tokenId, docsCount, err := p.db.GetTokenId(token)
-	if err != nil {
-		log.Println(err.Error())
-		return err
-	}
-	item, ok := index[tokenId]
+	item, ok := index[token]
 	if !ok {
 		item = &tokenIndexItem{
-			tokenId:        tokenId,
+			token:          token,
 			positionsCount: 0,
 			postings: &postingsList{
 				documentId: documentId,
-				positions:  nil,
-				next:       nil,
 			},
 		}
 		// 如果时检索时调用，则文档数量就是实际值；建索引时调用就是当前文档（个数1）
 		if documentId == searchDocId {
-			item.documentCount = docsCount
+			item.documentCount = p.db.GetDocumentsCount()
 		} else {
 			item.documentCount = 1
 		}
-		index[tokenId] = item
+		index[token] = item
 	}
 	// 词元出现次数 +1
 	item.postings.positions = append(item.postings.positions, pos)
@@ -158,7 +174,7 @@ func (p *postingsList) merge(postings *postingsList) *postingsList {
 func (p *postingsList) encode() []byte {
 	var buf []byte
 	tmp := make([]byte, binary.MaxVarintLen64)
-	for ; p != nil; p = p.next {
+	for p := p; p != nil; p = p.next {
 		length := binary.PutVarint(tmp, int64(p.documentId))
 		buf = append(buf, tmp[:length]...)
 		length = binary.PutVarint(tmp, int64(len(p.positions)))
@@ -203,41 +219,69 @@ func decodePostings(data []byte) (*postingsList, int) {
 	return head.next, postingsLength
 }
 
-// 将 index 合并进索引管理器
-func (m *indexManager) merge(index invertedIndex) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	if len(m.indexBuffer) == 0 {
-		m.indexBuffer = index
-	} else {
-		m.indexBuffer.merge(index)
-	}
-	m.indexCount++
-	// 缓存数量大于阈值，异步刷新到存储器
-	if m.indexCount > m.bufferFlushThreshold {
-		go flushIndex(m.indexBuffer, m.db)
-		m.indexBuffer = make(invertedIndex)
-		m.indexCount = 0
-	}
-}
-
-// 将内存中的缓冲的索引与存储器中的索引合并后刷新到存储器中
-func flushIndex(index invertedIndex, destDB *db.IndexDB) {
-	for tokenId, item := range index {
-		// 从数据库中取出来旧的索引
-		data, err := destDB.GetPostings(tokenId)
+func (m *indexManager) indexer() {
+	for {
+		doc := <-m.indexChannel
+		parsedDocument := parseDocument(doc[1])
+		if parsedDocument == nil {
+			continue
+		}
+		docId, err := m.db.AddDocument(doc[0], parsedDocument.title, parsedDocument.body)
 		if err != nil {
 			log.Println(err.Error())
 			continue
 		}
-		postings, docsCount := decodePostings(data)
-		// 内存中合并
-		postings = postings.merge(item.postings)
-		// 写回
-		data = postings.encode()
-		err = destDB.UpdatePostings(tokenId, item.documentCount+docsCount, data)
-		if err != nil {
-			log.Println(err.Error())
+		index := m.textProcessor.textToInvertedIndex(docId, parsedDocument)
+		m.mergeChannel <- index
+	}
+}
+
+// 将 index 合并进索引管理器，只能被单个 goroutine 执行
+func (m *indexManager) merger() {
+	for {
+		index := <-m.mergeChannel
+		if len(m.indexBuffer) == 0 {
+			m.indexBuffer = index
+		} else {
+			m.indexBuffer.merge(index)
 		}
+		m.indexCount++
+		// 缓存数量大于阈值，异步刷新到存储器
+		if m.indexCount >= m.bufferFlushThreshold {
+			m.flushChannel <- m.indexBuffer
+			m.indexBuffer = make(invertedIndex)
+			m.indexCount = 0
+		}
+	}
+}
+
+// 将内存中的缓冲的索引与存储器中的索引合并后刷新到存储器中
+func (m *indexManager) flusher() {
+	buf := make([]byte, binary.MaxVarintLen64)
+	for {
+		index := <-m.flushChannel
+		m.db.UpdatePostings(func(tx *bolt.Tx) error {
+			bucketPostings := tx.Bucket(db.BucketTokenPostings)
+			bucketDocCount := tx.Bucket(db.BucketTokenDocCount)
+
+			for token, item := range index {
+				tokenKey := []byte(token)
+				// 获取 token 对应的倒排列表 -> 解码 -> 内存中合并 -> 编码 -> 写回
+				data := bucketPostings.Get(tokenKey)
+				postings, docCount := decodePostings(data)
+				postings = postings.merge(item.postings)
+				docCount += item.documentCount
+				_ = bucketPostings.Put(tokenKey, postings.encode())
+
+				// 增加 token 对应的文档数量
+				data = bucketDocCount.Get(tokenKey)
+				if len(data) > 0 {
+					n, _ := binary.Varint(data)
+					docCount += int(n)
+				}
+				_ = bucketDocCount.Put(tokenKey, util.EncodeVarInt(buf, int64(docCount)))
+			}
+			return nil
+		})
 	}
 }

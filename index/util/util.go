@@ -1,6 +1,7 @@
 package util
 
 import (
+	"encoding/binary"
 	"net/url"
 	"strconv"
 	"strings"
@@ -58,4 +59,14 @@ func ToBool(dest *bool, value string) {
 	if b, err := strconv.ParseBool(value); err == nil {
 		*dest = b
 	}
+}
+
+func EncodeVarInt(buf []byte, i int64) []byte {
+	if len(buf) < binary.MaxVarintLen64 {
+		panic("buf length too small")
+	}
+	length := binary.PutVarint(buf, i)
+	ret := make([]byte, length)
+	copy(ret, buf[:length])
+	return ret
 }
