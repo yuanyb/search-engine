@@ -28,14 +28,16 @@ type IndexDB struct {
 		birthday int64
 		sync.Mutex
 	}
-	docUrlBuffer *util.Buffer
+	tokenDocsCountBuffer *util.Buffer
+	docUrlBuffer         *util.Buffer
 }
 
 type IndexDBOptions struct {
-	DocUrlBufferSize   int
-	PostingsBufferSize int
-	DocumentDBPath     string
-	IndexDBPath        string
+	DocUrlBufferSize         int
+	PostingsBufferSize       int
+	TokenDocsCountBufferSize int
+	DocumentDBPath           string
+	IndexDBPath              string
 }
 
 func NewIndexDB(options *IndexDBOptions) *IndexDB {
@@ -99,12 +101,23 @@ func NewIndexDB(options *IndexDBOptions) *IndexDB {
 		})
 		return value
 	})
+	tokenDocsCountBuffer := util.NewBuffer(options.TokenDocsCountBufferSize, func(key interface{}) interface{} {
+		var count int64
+		_ = indexDB.View(func(tx *bolt.Tx) error {
+			bucket := tx.Bucket(BucketTokenDocCount)
+			ret := bucket.Get([]byte(fmt.Sprint(key)))
+			count, _ = binary.Varint(ret)
+			return nil
+		})
+		return int(count)
+	})
 
 	return &IndexDB{
-		docDB:          docDB,
-		indexDB:        indexDB,
-		postingsBuffer: postingsBuffer,
-		docUrlBuffer:   docUrlBuffer,
+		docDB:                docDB,
+		indexDB:              indexDB,
+		postingsBuffer:       postingsBuffer,
+		docUrlBuffer:         docUrlBuffer,
+		tokenDocsCountBuffer: tokenDocsCountBuffer,
 	}
 }
 
@@ -116,6 +129,11 @@ func (db *IndexDB) UpdatePostings(fn func(tx *bolt.Tx) error) {
 // 检索使用
 func (db *IndexDB) FetchPostings(token string) []byte {
 	return db.postingsBuffer.Get(token).([]byte)
+}
+
+// 获取包含 token 的文档数量
+func (db *IndexDB) GetDocsCountOfToken(token string) int {
+	return db.tokenDocsCountBuffer.Get(token).(int)
 }
 
 // 获取文档库中文档的数量

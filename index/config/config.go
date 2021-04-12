@@ -13,7 +13,8 @@ var localConfigItem = [...]string{"mysql.username", "mysql.password", "mysql.hos
 	"mysql.port", "mysql.dbname", "boltdb.indexPath", "boltdb.docPath", "indexer.port",
 	"indexer.docUrlBufferSize", "indexer.postingsBufferSize", "indexer.indexWorkerCount",
 	"indexer.indexChannelLength", "indexer.mergeChannelLength", "indexer.flushChannelLength",
-	"indexer.flushWorkerCount", "indexer.postingsBufferFlushThreshold", "redis.addr"}
+	"indexer.flushWorkerCount", "indexer.postingsBufferFlushThreshold", "redis.addr",
+	"indexer.tokenDocCountBufferSize"}
 
 var config map[string]string
 
