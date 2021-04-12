@@ -83,7 +83,7 @@ func (s *SearchResults) not(s2 *SearchResults) {
 	}
 	newItems := make([]*searchResultItem, 0)
 	for _, item := range s.Items {
-		if item, ok := set[item.documentId]; !ok {
+		if _, ok := set[item.documentId]; !ok {
 			newItems = append(newItems, item)
 		}
 	}
