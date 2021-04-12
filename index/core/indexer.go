@@ -272,13 +272,6 @@ func (m *indexManager) flusher() {
 				postings = postings.merge(item.postings)
 				docCount += item.documentCount
 				_ = bucketPostings.Put(tokenKey, postings.encode())
-
-				// 增加 token 对应的文档数量
-				data = bucketDocCount.Get(tokenKey)
-				if len(data) > 0 {
-					n, _ := binary.Varint(data)
-					docCount += int(n)
-				}
 				_ = bucketDocCount.Put(tokenKey, util.EncodeVarInt(buf, int64(docCount)))
 			}
 			return nil
