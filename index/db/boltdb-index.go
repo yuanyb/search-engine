@@ -89,7 +89,7 @@ func NewIndexDB(options *IndexDBOptions) *IndexDB {
 	})
 	docUrlBuffer := util.NewBuffer(options.DocUrlBufferSize, func(key interface{}) interface{} {
 		var value string
-		_ = indexDB.View(func(tx *bolt.Tx) error {
+		_ = docDB.View(func(tx *bolt.Tx) error {
 			bucket := tx.Bucket(BucketDocUrl)
 			ret := bucket.Get([]byte(fmt.Sprint(key)))
 			value = string(ret)
