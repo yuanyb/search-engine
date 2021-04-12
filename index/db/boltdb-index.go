@@ -82,7 +82,9 @@ func NewIndexDB(options *IndexDBOptions) *IndexDB {
 		_ = indexDB.View(func(tx *bolt.Tx) error {
 			bucket := tx.Bucket(BucketTokenPostings)
 			ret := bucket.Get([]byte(key.(string)))
-			value = append(ret) // ret 仅在事务期间有效
+			// ret 仅在事务期间有效
+			value = make([]byte, len(ret))
+			copy(value, ret)
 			return nil
 		})
 		return value
