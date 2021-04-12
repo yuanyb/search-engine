@@ -264,6 +264,7 @@ func (s *searcher) searchDocs(query, site string) *SearchResults {
 		searchTitleOrBody(true)
 		searchTitleOrBody(false)
 	}
+	sort.Sort(results)
 	return results
 }
 
