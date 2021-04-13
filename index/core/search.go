@@ -230,7 +230,6 @@ func (s *searcher) searchDocs(query, site string) *SearchResults {
 			}
 			continue
 		}
-		cursors[0] = cursors[0].next
 		// 如果该文档的URL不是指定域名下的
 		if site != "" {
 			u := s.db.GetDocumentUrl(baseDocId)
@@ -264,6 +263,8 @@ func (s *searcher) searchDocs(query, site string) *SearchResults {
 		}
 		searchTitleOrBody(true)
 		searchTitleOrBody(false)
+		// 不能在 for 首部，因为循环体中有 continue
+		cursors[0] = cursors[0].next
 	}
 	sort.Sort(results)
 	return results
