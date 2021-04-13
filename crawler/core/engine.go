@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"search-engine/crawler/config"
 	"search-engine/crawler/util"
+	"sync/atomic"
 	"time"
 )
 
@@ -23,7 +24,13 @@ type CrawlerEngine struct {
 	// 协程数量
 	goroutineCount int
 	// 种子 URL
-	seedUrls []string
+	seedUrls    []string
+	SeedUrlChan chan string
+
+	// 统计
+	Birthday     int64
+	CrawledCount int32
+	FailureCount int32
 }
 
 // UrlGroup 表示一个 URL 组，Leader 这个 URL 对应页面文档中的所有链接就是 Members
@@ -36,6 +43,7 @@ func (e *CrawlerEngine) startCrawlerGoroutine() {
 	for i := 0; i < e.goroutineCount; i++ {
 		go func(num int) {
 			defer e.fallback()
+			var u string
 			for {
 				// 暂停执行，如果需要的话
 				begin := time.Now()
@@ -44,14 +52,20 @@ func (e *CrawlerEngine) startCrawlerGoroutine() {
 					continue
 				}
 
-				// 获取下一个 URL 并下载
-				u := <-e.urlChan[num]
+				// 获取下一个 URL 并下载，优先从 seedUrlChan 获取
+				select {
+				case u = <-e.SeedUrlChan:
+				default:
+					u = <-e.urlChan[num]
+				}
 				document, err := e.downloader.DownloadText(u)
 				if err != nil {
+					atomic.AddInt32(&e.FailureCount, 1)
 					continue
 				}
 
 				// 发送document，从网页中提取出 URL、过滤，然后交给调度器
+				atomic.AddInt32(&e.CrawledCount, 1)
 				SendDocument(u, document)
 				urls := ExtractUrls(u, document)
 				urls = e.filterUrl(urls)
@@ -188,7 +202,6 @@ func (e *CrawlerEngine) getHostIpHash(rawUrl string) int {
 func (e *CrawlerEngine) Run() {
 	e.startSchedulerGoroutine()
 	e.startCrawlerGoroutine()
-	<-make(chan byte)
 }
 
 func NewCrawlerEngine(sch Scheduler, dl Downloader, goCount int, seedUrls []string) *CrawlerEngine {
@@ -204,8 +217,10 @@ func NewCrawlerEngine(sch Scheduler, dl Downloader, goCount int, seedUrls []stri
 		downloader:     dl,
 		goroutineCount: goCount,
 		seedUrls:       seedUrls,
+		SeedUrlChan:    make(chan string),
 		urlChan:        chanList,
 		urlGroupChan:   make(chan UrlGroup, goCount*100),
+		Birthday:       time.Now().Unix(),
 	}
 	return engine
 }

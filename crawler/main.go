@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net/http"
+	"search-engine/crawler/api"
 	"search-engine/crawler/config"
 	"search-engine/crawler/core"
 	"strconv"
@@ -13,10 +15,14 @@ func main() {
 		panic("goroutineCount format error")
 	}
 
-	core.NewCrawlerEngine(
+	engine := core.NewCrawlerEngine(
 		core.NewBFScheduler(),
 		core.GlobalDl,
 		goroutineCount,
 		strings.Split(config.LocalConfig["crawler.seedUrls"], ","),
-	).Run()
+	)
+	engine.Run()
+
+	api.Serve(engine)
+	_ = http.ListenAndServe("localhost:"+config.LocalConfig["crawler.port"], nil)
 }
