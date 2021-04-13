@@ -64,7 +64,7 @@ func parseQuery(query string) *parsedQuery {
 		case len(fragment) == 0:
 			break
 		case strings.HasPrefix(fragment, "-"):
-			ret.exclusions = append(ret.exclusions, fragment)
+			ret.exclusions = append(ret.exclusions, fragment[1:])
 		case strings.HasPrefix(fragment, "site:"):
 			// 多个取第一个
 			if len(ret.site) > 0 {
