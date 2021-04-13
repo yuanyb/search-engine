@@ -21,7 +21,7 @@ var (
 	// 本地配置项必须提供
 	localConfigItem = [...]string{"mysql.username", "mysql.password", "mysql.host",
 		"mysql.port", "mysql.dbname", "redis.server", "indexer.server", "crawler.goroutineCount",
-		"crawler.seedUrls"}
+		"crawler.seedUrls", "crawler.port"}
 
 	LocalConfig   = loadLocalConfig()
 	defaultConfig = CrawlerConfig{
