@@ -95,9 +95,9 @@ func (p *textProcessor) textToInvertedIndex(documentId int, document *parsedDocu
 func (p *textProcessor) queryToTokens(query string) []*tokenIndexItem {
 	index := invertedIndex{}
 	nGramSplit(query, p.n, func(token string, pos int) error {
-		return p.tokenToPostingsLists(index, searchDocId, token, pos, true)
+		return p.tokenToPostingsLists(index, searchDocId, token, pos, false)
 	})
-	ret := make([]*tokenIndexItem, 0)
+	ret := make([]*tokenIndexItem, 0, len(index))
 	for _, item := range index {
 		ret = append(ret, item)
 	}

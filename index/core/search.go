@@ -206,7 +206,7 @@ func (s *searcher) searchDocs(query, site string) *SearchResults {
 	heap.Init(results)
 
 	// 检索候选文档，以第一个词元的倒排列表（最短）为基准
-	for ; cursors[0] != nil; cursors[0] = cursors[0].next {
+	for cursors[0] != nil {
 		baseDocId := cursors[0].documentId
 		nextDocId := -1
 		// 对除基准词元外的所有词元，不断获其取下一个docId，直到当前docId不小于基准词元的docId
@@ -228,11 +228,9 @@ func (s *searcher) searchDocs(query, site string) *SearchResults {
 			for cursors[0] != nil && cursors[0].documentId < nextDocId {
 				cursors[0] = cursors[0].next
 			}
-			if cursors[0] == nil {
-				break
-			}
 			continue
 		}
+		cursors[0] = cursors[0].next
 		// 如果该文档的URL不是指定域名下的
 		if site != "" {
 			u := s.db.GetDocumentUrl(baseDocId)
