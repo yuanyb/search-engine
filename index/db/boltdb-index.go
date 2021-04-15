@@ -22,14 +22,14 @@ type IndexDB struct {
 	indexDB *bolt.DB
 	docDB   *bolt.DB
 
-	postingsBuffer  *util.Buffer
+	PostingsBuffer  *util.Buffer
 	docsCountBuffer struct {
 		count    int64
 		birthday int64
 		sync.Mutex
 	}
-	tokenDocsCountBuffer *util.Buffer
-	docUrlBuffer         *util.Buffer
+	TokenDocsCountBuffer *util.Buffer
+	DocUrlBuffer         *util.Buffer
 }
 
 type IndexDBOptions struct {
@@ -115,9 +115,9 @@ func NewIndexDB(options *IndexDBOptions) *IndexDB {
 	return &IndexDB{
 		docDB:                docDB,
 		indexDB:              indexDB,
-		postingsBuffer:       postingsBuffer,
-		docUrlBuffer:         docUrlBuffer,
-		tokenDocsCountBuffer: tokenDocsCountBuffer,
+		PostingsBuffer:       postingsBuffer,
+		DocUrlBuffer:         docUrlBuffer,
+		TokenDocsCountBuffer: tokenDocsCountBuffer,
 	}
 }
 
@@ -128,12 +128,12 @@ func (db *IndexDB) UpdatePostings(fn func(tx *bolt.Tx) error) {
 
 // 检索使用
 func (db *IndexDB) FetchPostings(token string) []byte {
-	return db.postingsBuffer.Get(token).([]byte)
+	return db.PostingsBuffer.Get(token).([]byte)
 }
 
 // 获取包含 token 的文档数量
 func (db *IndexDB) GetDocsCountOfToken(token string) int {
-	return db.tokenDocsCountBuffer.Get(token).(int)
+	return db.TokenDocsCountBuffer.Get(token).(int)
 }
 
 // 获取文档库中文档的数量
@@ -163,7 +163,7 @@ func (db *IndexDB) GetDocumentsCount() int {
 
 // 根据文档 ID 获取文档的 URL
 func (db *IndexDB) GetDocumentUrl(docId int) string {
-	return db.docUrlBuffer.Get(docId).(string)
+	return db.DocUrlBuffer.Get(docId).(string)
 }
 
 func (db *IndexDB) AddDocument(url, title, body string) (int, error) {

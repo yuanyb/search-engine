@@ -20,7 +20,7 @@ package db
 //	addToken          *sql.Stmt
 //	tokenIdBuffer     *util.Buffer
 //	getPostings       *sql.Stmt
-//	postingsBuffer    *util.Buffer
+//	PostingsBuffer    *util.Buffer
 //	getDocumentsCount *sql.Stmt
 //	docsCountBuffer    struct {
 //		lock     sync.Mutex
@@ -28,7 +28,7 @@ package db
 //		count    int64
 //	}
 //	getDocumentUrl    *sql.Stmt
-//	docUrlBuffer      *util.Buffer
+//	DocUrlBuffer      *util.Buffer
 //	getDocumentDetail *sql.Stmt
 //	storeToken        *sql.Stmt
 //	updatePostings    *sql.Stmt
@@ -95,7 +95,7 @@ package db
 //	stmt, err = indexDB.Prepare("select postings from tokens where id = ?")
 //	handleDBInitError(err)
 //	db.getPostings = stmt
-//	db.postingsBuffer = util.NewBuffer(options.PostingsBufferSize, func(tokenId interface{}) (interface{}, error) {
+//	db.PostingsBuffer = util.NewBuffer(options.PostingsBufferSize, func(tokenId interface{}) (interface{}, error) {
 //		var v []byte
 //		err := db.getPostings.QueryRow(tokenId).Scan(&v)
 //		return v, err
@@ -115,7 +115,7 @@ package db
 //	stmt, err = docDB.Prepare("select url from documents where id = ?")
 //	handleDBInitError(err)
 //	db.getDocumentUrl = stmt
-//	db.docUrlBuffer = util.NewBuffer(options.DocUrlBufferSize, func(docId interface{}) (interface{}, error) {
+//	db.DocUrlBuffer = util.NewBuffer(options.DocUrlBufferSize, func(docId interface{}) (interface{}, error) {
 //		var url string
 //		err := db.getDocumentUrl.QueryRow(docId).Scan(&url)
 //		return url, err
@@ -151,14 +151,14 @@ package db
 //
 //// 获取词元的倒排列表
 //func (db *IndexDB) GetPostings(tokenId int) ([]byte, error) {
-//	postingsList, err := db.postingsBuffer.Get(tokenId)
+//	postingsList, err := db.PostingsBuffer.Get(tokenId)
 //	return postingsList.([]byte), err
 //}
 //
 //// 修改指定词元的倒排列表
 //func (db *IndexDB) UpdatePostings(tokenId, docsCount int, data []byte) error {
 //	_, err := db.updatePostings.Exec(tokenId, docsCount, data, docsCount, data)
-//	db.postingsBuffer.Del(tokenId) // 删除旧的
+//	db.PostingsBuffer.Del(tokenId) // 删除旧的
 //	return err
 //}
 //
@@ -183,7 +183,7 @@ package db
 //
 //// 根据文档 id 获取文档 url
 //func (db *IndexDB) GetDocUrl(id int) (string, error) {
-//	url, err := db.docUrlBuffer.Get(id)
+//	url, err := db.DocUrlBuffer.Get(id)
 //	return url.(string), err
 //}
 //

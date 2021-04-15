@@ -31,13 +31,16 @@ type Response struct {
 }
 
 type MonitorInfo struct {
-	MemTotal        int     `json:"mem_total"`
-	MemUsed         int     `json:"mem_used"`
-	CpuPercent      float64 `json:"cpu_percent"`
-	RunningTime     int     `json:"running_time"`
-	IndexFileSize   int     `json:"index_size"`
-	IndexedDocCount int     `json:"indexed_doc_count"`
-	TokenCount      int     `json:"token_count"`
+	MemTotal                    int     `json:"mem_total"`
+	MemUsed                     int     `json:"mem_used"`
+	CpuPercent                  float64 `json:"cpu_percent"`
+	RunningTime                 int     `json:"running_time"`
+	IndexFileSize               int     `json:"index_size"`
+	IndexedDocCount             int     `json:"indexed_doc_count"`
+	TokenCount                  int     `json:"token_count"`
+	PostingsBufferHitRate       float64 `json:"postings_buffer_hit_rate"`
+	TokenDocsCountBufferHitRate float64 `json:"token_docs_count_buffer_hit_rate"`
+	DocUrlBufferHitRate         float64 `json:"doc_url_buffer_hit_rate"`
 }
 
 func Serve(port int) {
@@ -107,9 +110,11 @@ func monitor(writer http.ResponseWriter, request *http.Request) {
 	if fileInfo, err := os.Stat(config.Get("boltdb.indexPath")); err == nil {
 		info.IndexFileSize = int(fileInfo.Size())
 	}
-	// Buffer 信息，索引词条
 	info.IndexedDocCount = engine.DB.GetDocumentsCount()
 	info.TokenCount = engine.DB.GetTokenCount()
+	info.DocUrlBufferHitRate = engine.DB.DocUrlBuffer.GetHitRate()
+	info.PostingsBufferHitRate = engine.DB.PostingsBuffer.GetHitRate()
+	info.TokenDocsCountBufferHitRate = engine.DB.TokenDocsCountBuffer.GetHitRate()
 
 	write(writer, http.StatusOK, &Response{Code: codeSuccess, Data: info})
 }
