@@ -3,6 +3,7 @@ package core
 import (
 	"search-engine/index/config"
 	"search-engine/index/db"
+	"search-engine/index/util"
 	"strings"
 	"time"
 )
@@ -71,6 +72,8 @@ func (e *Engine) Search(query string) SearchResults {
 			return searchResults
 		}
 	}
+	// 仅返回30条结果
+	searchResults.Items = searchResults.Items[:util.MinInt(30, len(searchResults.Items))]
 	// 获取文档信息及高亮结果
 	searchResults.applyHighlight(e.DB)
 	return searchResults
