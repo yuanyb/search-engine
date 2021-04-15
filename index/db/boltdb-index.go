@@ -206,3 +206,15 @@ func (db *IndexDB) GetDocument(docId int) (string, string, string) {
 	})
 	return url, title, body
 }
+
+// 统计用
+func (db *IndexDB) GetTokenCount() int {
+	var count int
+	_ = db.indexDB.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(BucketTokenDocCount)
+		count = bucket.Stats().KeyN
+		return nil
+	})
+	return count
+
+}

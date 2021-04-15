@@ -4,9 +4,13 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"search-engine/index/config"
 	"search-engine/index/core"
 	"strconv"
 	"strings"
@@ -26,11 +30,22 @@ type Response struct {
 	Data interface{} `json:"data,omitempty"`
 }
 
+type MonitorInfo struct {
+	MemTotal        int     `json:"mem_total"`
+	MemUsed         int     `json:"mem_used"`
+	CpuPercent      float64 `json:"cpu_percent"`
+	RunningTime     int     `json:"running_time"`
+	IndexFileSize   int     `json:"index_size"`
+	IndexedDocCount int     `json:"indexed_doc_count"`
+	TokenCount      int     `json:"token_count"`
+}
+
 func Serve(port int) {
 	engine = core.NewEngine()
 	http.HandleFunc("/search", searchHandler)
-	// 该接口不因该暴露出去
+	// 该接口不应该暴露出去，为了方便忽略了
 	http.HandleFunc("/index", indexHandler)
+	http.HandleFunc("/monitor", monitor)
 	err := http.ListenAndServe(":"+strconv.Itoa(port), nil)
 	log.Fatal(err)
 }
@@ -74,6 +89,29 @@ func indexHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 	engine.AddDocument(url, document)
 	write(writer, http.StatusOK, &Response{Code: codeSuccess})
+}
+
+func monitor(writer http.ResponseWriter, request *http.Request) {
+	info := new(MonitorInfo)
+	// 获取操作系统信息
+	if m, err := mem.VirtualMemory(); err == nil {
+		info.MemTotal = int(m.Total)
+		info.MemUsed = int(m.Used)
+	}
+	if c, err := cpu.Percent(time.Millisecond*500, false); err == nil {
+		info.CpuPercent = c[0]
+	}
+
+	// 获取索引程序信息
+	info.RunningTime = int(time.Now().Unix() - engine.Birthday)
+	if fileInfo, err := os.Stat(config.Get("boltdb.indexPath")); err == nil {
+		info.IndexFileSize = int(fileInfo.Size())
+	}
+	// Buffer 信息，索引词条
+	info.IndexedDocCount = engine.DB.GetDocumentsCount()
+	info.TokenCount = engine.DB.GetTokenCount()
+
+	write(writer, http.StatusOK, &Response{Code: codeSuccess, Data: info})
 }
 
 func write(writer http.ResponseWriter, status int, v interface{}) {

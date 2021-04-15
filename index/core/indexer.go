@@ -220,8 +220,7 @@ func decodePostings(data []byte) (*postingsList, int) {
 }
 
 func (m *indexManager) indexer() {
-	for {
-		doc := <-m.indexChannel
+	for doc := range m.indexChannel {
 		parsedDocument := parseDocument(doc[1])
 		if parsedDocument == nil {
 			continue
@@ -238,8 +237,7 @@ func (m *indexManager) indexer() {
 
 // 将 index 合并进索引管理器，只能被单个 goroutine 执行
 func (m *indexManager) merger() {
-	for {
-		index := <-m.mergeChannel
+	for index := range m.mergeChannel {
 		if len(m.indexBuffer) == 0 {
 			m.indexBuffer = index
 		} else {
@@ -258,8 +256,7 @@ func (m *indexManager) merger() {
 // 将内存中的缓冲的索引与存储器中的索引合并后刷新到存储器中
 func (m *indexManager) flusher() {
 	buf := make([]byte, binary.MaxVarintLen64)
-	for {
-		index := <-m.flushChannel
+	for index := range m.flushChannel {
 		m.db.UpdatePostings(func(tx *bolt.Tx) error {
 			bucketPostings := tx.Bucket(db.BucketTokenPostings)
 			bucketDocCount := tx.Bucket(db.BucketTokenDocCount)

@@ -9,6 +9,7 @@ import (
 type parsedDocument struct {
 	title string
 	body  string
+	// <meta name="keywords" content="xxx">
 	// h1 []string // h1标签 权重高
 }
 

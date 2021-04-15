@@ -4,6 +4,7 @@ import (
 	"search-engine/index/config"
 	"search-engine/index/db"
 	"strings"
+	"time"
 )
 
 const searchDocId = -1024
@@ -11,7 +12,8 @@ const searchDocId = -1024
 type Engine struct {
 	indexManager *indexManager
 	searcher     *searcher
-	db           *db.IndexDB
+	DB           *db.IndexDB
+	Birthday     int64
 }
 
 func NewEngine() *Engine {
@@ -26,7 +28,8 @@ func NewEngine() *Engine {
 	e := &Engine{
 		indexManager: newIndexManager(indexDB, tp, config.GetInt("indexer.postingsBufferFlushThreshold")),
 		searcher:     newSearcher(indexDB, tp),
-		db:           indexDB,
+		DB:           indexDB,
+		Birthday:     time.Now().Unix(),
 	}
 	return e
 }
@@ -51,15 +54,24 @@ func (e *Engine) Search(query string) SearchResults {
 	}
 	// 检索并合并结果
 	parsedQuery := parseQuery(query)
+	if len(parsedQuery.keywords) == 0 {
+		return searchResults
+	}
 	for _, keyword := range parsedQuery.keywords {
 		r := e.searcher.searchDocs(keyword, parsedQuery.site)
 		searchResults.and(r)
+		if len(searchResults.Items) == 0 {
+			return searchResults
+		}
 	}
 	for _, exclusion := range parsedQuery.exclusions {
 		r := e.searcher.searchDocs(exclusion, parsedQuery.site)
 		searchResults.not(r)
+		if len(searchResults.Items) == 0 {
+			return searchResults
+		}
 	}
 	// 获取文档信息及高亮结果
-	searchResults.applyHighlight(e.db)
+	searchResults.applyHighlight(e.DB)
 	return searchResults
 }
