@@ -14,8 +14,10 @@ type Buffer struct {
 	list    *list.List
 	_map    map[interface{}]*list.Element
 	maxSize int
-	getFunc getFunc // 缓存不命中时，获取数据的函数
-	lock    sync.Mutex
+	// 永不失效使用：math.MaxInt64
+	validityPeriod int64
+	getFunc        getFunc // 缓存不命中时，获取数据的函数
+	lock           sync.Mutex
 }
 
 type node struct {
@@ -23,12 +25,13 @@ type node struct {
 	birthday   int64 // 创建这个 node 时的时间戳，避免高频 token 一直存在 Buffer 中，而得不到刷新
 }
 
-func NewBuffer(size int, getFunc getFunc) *Buffer {
+func NewBuffer(size int, validityPeriod int64, getFunc getFunc) *Buffer {
 	return &Buffer{
-		list:    list.New(),
-		_map:    make(map[interface{}]*list.Element, size),
-		maxSize: size,
-		getFunc: getFunc,
+		list:           list.New(),
+		_map:           make(map[interface{}]*list.Element, size),
+		maxSize:        size,
+		validityPeriod: validityPeriod,
+		getFunc:        getFunc,
 	}
 }
 
@@ -36,11 +39,12 @@ func (b *Buffer) Get(key interface{}) interface{} {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	e, ok := b._map[key]
-	if !ok || time.Now().Unix()-e.Value.(*node).birthday > 60 {
+	if !ok || time.Now().Unix()-e.Value.(*node).birthday > b.validityPeriod {
 		v := b.getFunc(key)
 		b._add(key, v)
 		return v
 	}
+	println("命中")
 	b.list.Remove(e)
 	b.list.PushFront(e)
 	return e.Value.(*node).value

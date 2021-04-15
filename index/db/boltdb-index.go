@@ -79,7 +79,7 @@ func NewIndexDB(options *IndexDBOptions) *IndexDB {
 	}
 
 	// Buffer
-	postingsBuffer := util.NewBuffer(options.PostingsBufferSize, func(key interface{}) interface{} {
+	postingsBuffer := util.NewBuffer(options.PostingsBufferSize, 60, func(key interface{}) interface{} {
 		var value []byte
 		_ = indexDB.View(func(tx *bolt.Tx) error {
 			bucket := tx.Bucket(BucketTokenPostings)
@@ -91,7 +91,7 @@ func NewIndexDB(options *IndexDBOptions) *IndexDB {
 		})
 		return value
 	})
-	docUrlBuffer := util.NewBuffer(options.DocUrlBufferSize, func(key interface{}) interface{} {
+	docUrlBuffer := util.NewBuffer(options.DocUrlBufferSize, 60, func(key interface{}) interface{} {
 		var value string
 		_ = docDB.View(func(tx *bolt.Tx) error {
 			bucket := tx.Bucket(BucketDocUrl)
@@ -101,7 +101,7 @@ func NewIndexDB(options *IndexDBOptions) *IndexDB {
 		})
 		return value
 	})
-	tokenDocsCountBuffer := util.NewBuffer(options.TokenDocsCountBufferSize, func(key interface{}) interface{} {
+	tokenDocsCountBuffer := util.NewBuffer(options.TokenDocsCountBufferSize, 60, func(key interface{}) interface{} {
 		var count int64
 		_ = indexDB.View(func(tx *bolt.Tx) error {
 			bucket := tx.Bucket(BucketTokenDocCount)
