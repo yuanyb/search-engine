@@ -15,7 +15,7 @@ type parsedDocument struct {
 
 var (
 	titlePattern     = regexp.MustCompile(`(?ism)<title.*?>(.*?)</title>`)
-	trimTagPattern   = regexp.MustCompile(`(?ism)<script.*?>.*?</script>|<style.*?>.*?</style>|<title.*?>.*?</title>|<.+?>`)
+	trimTagPattern   = regexp.MustCompile(`(?ism)<!--.*?-->|<script.*?>.*?</script>|<style.*?>.*?</style>|<title.*?>.*?</title>|<.+?>`)
 	trimSpacePattern = regexp.MustCompile(`(?m)\s+`)
 )
 
