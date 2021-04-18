@@ -54,7 +54,7 @@ func SendDocument(url, document string) {
 		})
 		retryCount := config.Get().RetryCount
 		for i := 0; i < retryCount+1; i++ {
-			req, _ := http.NewRequest("PUT", config.LocalConfig["indexer.server"], bytes.NewReader(j))
+			req, _ := http.NewRequest("PUT", config.GetLocal("indexer.addr"), bytes.NewReader(j))
 			_, err := http.DefaultClient.Do(req)
 			if err == nil {
 				break

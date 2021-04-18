@@ -20,10 +20,10 @@ var (
 
 	// 本地配置项必须提供
 	localConfigItem = [...]string{"mysql.username", "mysql.password", "mysql.host",
-		"mysql.port", "mysql.dbname", "redis.server", "indexer.server", "crawler.goroutineCount",
-		"crawler.seedUrls", "crawler.port"}
+		"mysql.port", "mysql.dbname", "redis.addr", "indexer.addr", "crawler.goroutineCount",
+		"crawler.seedUrls", "crawler.listenAddr"}
 
-	LocalConfig   = loadLocalConfig()
+	localConfig   = loadLocalConfig()
 	defaultConfig = CrawlerConfig{
 		RandomInterval: false,
 		Interval:       3000,
@@ -75,7 +75,7 @@ func (c *CrawlerConfig) fill(name, value string) {
 func init() {
 	// 初始化数据库
 	var err error
-	lc := LocalConfig
+	lc := localConfig
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", lc["mysql.username"],
 		lc["mysql.password"], lc["mysql.host"], lc["mysql.port"], lc["mysql.dbname"])
 
@@ -85,7 +85,7 @@ func init() {
 	if err = db.Ping(); err != nil {
 		panic(err)
 	}
-	if stmt, err = db.Prepare("select `name`, `value` from `search_engine_crawler`"); err != nil {
+	if stmt, err = db.Prepare("select `name`, `value` from `crawler`"); err != nil {
 		panic(err)
 	}
 
@@ -167,4 +167,8 @@ func loadLatestConfig() *CrawlerConfig {
 
 func Get() *CrawlerConfig {
 	return dynamicConfig.Load().(*CrawlerConfig)
+}
+
+func GetLocal(key string) string {
+	return localConfig[key]
 }

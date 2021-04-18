@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>不追踪你的隐私的搜索引擎</title>
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/4.3.1/css/bootstrap.min.css">
+    <script src="https://cdn.staticfile.org/jquery/3.2.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.4.1/font/bootstrap-icons.css">
+    <script src="https://cdn.staticfile.org/popper.js/1.15.0/umd/popper.min.js"></script>
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <style>
+        /*去掉bootstrap自带的input输入框半透明阴影*/
+        .form-control:focus {
+            box-shadow: none;
+        }
+        /*去除下拉菜单按钮的箭头*/
+        .dropdown-toggle::after {
+            display: none;
+        }
+    </style>
+</head>
+<body style="background-color: #F7F7F7">
+<div class="container">
+    <div class="row">
+        <div class="col-2 p-0">
+            <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="100%" viewBox="0 0 795 300" data-parent="shape_a5Dq2JeucR"><rect fill="rgba(0,0,0,0)" width="581" height="128" x="107" y="107"/><g data-width="580.51178125" transform="translate(107.244109375, 0)"><path d="M47.96-49.63L64.42-33.18Q69.75-40.28 69.75-49.63L69.75-49.63Q69.75-61.23 61.55-69.44L61.55-69.44Q53.34-77.59 41.74-77.59L41.74-77.59Q30.15-77.59 22.00-69.44L22.00-69.44Q13.79-61.23 13.79-49.63L13.79-49.63Q13.79-38.04 22.00-29.83L22.00-29.83Q30.15-21.63 41.74-21.63L41.74-21.63Q50.10-21.63 56.63-25.86L56.63-25.86L40.44-42.11L47.96-49.63ZM73.98-8.52L64.31-18.18Q54.54-10.97 41.74-10.97L41.74-10.97Q25.76-10.97 14.42-22.31L14.42-22.31Q3.13-33.59 3.13-49.63L3.13-49.63Q3.13-65.62 14.42-76.96L14.42-76.96Q25.76-88.30 41.74-88.30L41.74-88.30Q57.78-88.30 69.07-76.96L69.07-76.96Q80.41-65.62 80.41-49.63L80.41-49.63Q80.41-35.84 72.05-25.55L72.05-25.55L81.50-16.09L73.98-8.52Z" transform="translate(0 204) " fill="rgb(36, 145, 246)" stroke="rgb(36, 145, 246)" stroke-linecap="square" stroke-linejoin="square" stroke-width="0.178" data-glyph-w="83.54150390625" data-glyph-h="111.4931640625" data-glyph-ascender="89.654296875" data-glyph-descender="-21.8388671875"/><path d="M34.53-10.97Q46.71-10.97 55.28-18.02L55.28-18.02Q63.84-25.03 63.84-34.95L63.84-34.95L63.84-86.94L53.19-86.94L53.19-34.95Q53.19-29.47 47.75-25.55L47.75-25.55Q42.27-21.63 34.53-21.63L34.53-21.63Q26.80-21.63 21.37-25.55L21.37-25.55Q15.88-29.47 15.88-34.95L15.88-34.95L15.88-86.94L5.22-86.94L5.22-34.95Q5.22-25.03 13.79-18.02L13.79-18.02Q22.41-10.97 34.53-10.97L34.53-10.97Z" transform="translate(83.54150390625 204) " fill="rgb(246, 52, 52)" stroke="rgb(246, 52, 52)" stroke-linecap="square" stroke-linejoin="square" stroke-width="0.178" data-glyph-w="69.0693359375" data-glyph-h="111.4931640625" data-glyph-ascender="89.654296875" data-glyph-descender="-21.8388671875"/><path d="M25.76-12.33L25.76-76.28L3.13-76.28L3.13-86.94L59.09-86.94L59.09-76.28L36.42-76.28L36.42-12.33L25.76-12.33Z" transform="translate(152.61083984375 204) " fill="rgb(246, 149, 52)" stroke="rgb(246, 149, 52)" stroke-linecap="square" stroke-linejoin="square" stroke-width="0.178" data-glyph-w="62.22509765625" data-glyph-h="111.4931640625" data-glyph-ascender="89.654296875" data-glyph-descender="-21.8388671875"/><path d="" transform="translate(214.8359375 204) " fill="rgb(36, 145, 246)" stroke="rgb(36, 145, 246)" stroke-linecap="square" stroke-linejoin="square" stroke-width="0.178" data-glyph-w="42.586" data-glyph-h="107" data-glyph-ascender="94.16" data-glyph-descender="-12.84"/><path d="M33.80-10.97Q46.50-10.97 55.43-17.50L55.43-17.50Q64.42-24.03 64.42-33.28L64.42-33.28Q64.42-43.31 56.95-48.64L56.95-48.64Q51.67-52.35 40.44-54.81L40.44-54.81Q26.12-57.89 23.98-58.67L23.98-58.67Q16.46-61.55 16.46-67.29L16.46-67.29Q16.46-71.58 21.53-74.61L21.53-74.61Q26.59-77.59 33.80-77.59L33.80-77.59Q40.28-77.59 45.19-74.29L45.19-74.29Q50.05-71.05 50.94-66.14L50.94-66.14L61.70-66.14Q60.87-75.44 52.82-81.87L52.82-81.87Q44.77-88.30 33.80-88.30L33.80-88.30Q22.20-88.30 14.00-82.13L14.00-82.13Q5.80-75.97 5.80-67.29L5.80-67.29Q5.80-57.52 13.27-52.40L13.27-52.40Q18.44-48.90 29.78-46.55L29.78-46.55Q43.36-43.73 46.29-42.53L46.29-42.53Q53.76-39.55 53.76-33.28L53.76-33.28Q53.76-28.47 47.91-25.08L47.91-25.08Q42.06-21.63 33.80-21.63L33.80-21.63Q25.50-21.63 19.64-25.91L19.64-25.91Q13.79-30.25 13.79-36.31L13.79-36.31L3.13-36.31Q3.13-25.81 12.12-18.39L12.12-18.39Q21.11-10.97 33.80-10.97L33.80-10.97Z" transform="translate(257.4219375 204) " fill="rgb(7, 162, 128)" stroke="rgb(7, 162, 128)" stroke-linecap="square" stroke-linejoin="square" stroke-width="0.178" data-glyph-w="67.55419921875" data-glyph-h="111.4931640625" data-glyph-ascender="89.654296875" data-glyph-descender="-21.8388671875"/><path d="M54.86-32.29L13.64-32.29Q14.79-29.00 17.45-26.33L17.45-26.33Q22.10-21.63 28.74-21.63L28.74-21.63Q37.04-21.63 41.85-28.47L41.85-28.47L50.57-22.36Q42.63-10.97 28.74-10.97L28.74-10.97Q17.71-10.97 9.93-18.81L9.93-18.81Q2.09-26.59 2.09-37.62L2.09-37.62Q2.09-48.69 9.93-56.48L9.93-56.48Q17.71-64.26 28.74-64.26L28.74-64.26Q39.81-64.26 47.60-56.48L47.60-56.48Q55.38-48.69 55.38-37.62L55.38-37.62Q55.38-34.95 54.86-32.29L54.86-32.29ZM13.64-42.95L43.89-42.95Q42.74-46.29 40.07-48.95L40.07-48.95Q35.37-53.60 28.74-53.60L28.74-53.60Q22.10-53.60 17.45-48.95L17.45-48.95Q14.79-46.29 13.64-42.95L13.64-42.95Z" transform="translate(324.97613671875 204) " fill="rgb(246, 52, 52)" stroke="rgb(246, 52, 52)" stroke-linecap="square" stroke-linejoin="square" stroke-width="0.178" data-glyph-w="57.470703125" data-glyph-h="111.4931640625" data-glyph-ascender="89.654296875" data-glyph-descender="-21.8388671875"/><path d="M27.43-53.60Q21.37-53.60 17.03-48.95L17.03-48.95Q12.75-44.25 12.75-37.62L12.75-37.62Q12.75-30.98 17.03-26.33L17.03-26.33Q21.37-21.63 27.43-21.63L27.43-21.63Q33.49-21.63 37.77-26.33L37.77-26.33Q42.06-30.98 42.06-37.62L42.06-37.62Q42.06-44.25 37.77-48.95L37.77-48.95Q33.49-53.60 27.43-53.60L27.43-53.60ZM42.06-58.99L42.06-58.99L42.06-62.96L52.72-62.96L52.72-12.33L42.06-12.33L42.06-16.25Q35.58-10.97 27.06-10.97L27.06-10.97Q16.72-10.97 9.40-18.81L9.40-18.81Q2.09-26.59 2.09-37.62L2.09-37.62Q2.09-48.69 9.40-56.48L9.40-56.48Q16.72-64.26 27.06-64.26L27.06-64.26Q35.58-64.26 42.06-58.99Z" transform="translate(382.44683984375 204) " fill="rgb(36, 145, 246)" stroke="rgb(36, 145, 246)" stroke-linecap="square" stroke-linejoin="square" stroke-width="0.178" data-glyph-w="56.37353515625" data-glyph-h="111.4931640625" data-glyph-ascender="89.654296875" data-glyph-descender="-21.8388671875"/><path d="M14.32-40.28L14.32-40.28L14.32-12.33L3.66-12.33L3.66-62.96L14.32-62.96L14.32-59.30Q20.64-64.26 29.00-64.26L29.00-64.26Q30.30-64.26 31.66-64.16L31.66-64.16L31.66-53.03Q29.73-53.60 27.64-53.60L27.64-53.60Q22.15-53.60 18.23-49.74L18.23-49.74Q14.32-45.82 14.32-40.28Z" transform="translate(438.820375 204) " fill="rgb(246, 149, 52)" stroke="rgb(246, 149, 52)" stroke-linecap="square" stroke-linejoin="square" stroke-width="0.178" data-glyph-w="33.7509765625" data-glyph-h="111.4931640625" data-glyph-ascender="89.654296875" data-glyph-descender="-21.8388671875"/><path d="M12.75-37.62Q12.75-30.98 17.45-26.33L17.45-26.33Q22.10-21.63 28.74-21.63L28.74-21.63Q37.04-21.63 41.85-28.47L41.85-28.47L50.57-22.36Q42.58-10.97 28.74-10.97L28.74-10.97Q17.71-10.97 9.87-18.81L9.87-18.81Q2.09-26.59 2.09-37.62L2.09-37.62Q2.09-48.69 9.87-56.48L9.87-56.48Q17.71-64.26 28.74-64.26L28.74-64.26Q42.58-64.26 50.57-52.93L50.57-52.93L41.85-46.81Q37.04-53.60 28.74-53.60L28.74-53.60Q22.10-53.60 17.45-48.95L17.45-48.95Q12.75-44.25 12.75-37.62L12.75-37.62Z" transform="translate(472.5713515625 204) " fill="rgb(246, 52, 52)" stroke="rgb(246, 52, 52)" stroke-linecap="square" stroke-linejoin="square" stroke-width="0.178" data-glyph-w="52.6640625" data-glyph-h="111.4931640625" data-glyph-ascender="89.654296875" data-glyph-descender="-21.8388671875"/><path d="M14.32-40.44L14.32-40.44L14.32-12.33L3.66-12.33L3.66-86.94L14.32-86.94L14.32-58.93Q20.53-64.26 29.00-64.26L29.00-64.26Q38.35-64.26 44.98-57.68L44.98-57.68Q51.62-51.10 51.62-41.74L51.62-41.74L51.62-12.33L40.96-12.33L40.96-40.44Q40.96-45.92 37.09-49.79L37.09-49.79Q33.18-53.71 27.64-53.71L27.64-53.71Q22.15-53.71 18.23-49.79L18.23-49.79Q14.32-45.92 14.32-40.44Z" transform="translate(525.2354140625 204) " fill="rgb(246, 52, 52)" stroke="rgb(246, 52, 52)" stroke-linecap="square" stroke-linejoin="square" stroke-width="0.178" data-glyph-w="55.2763671875" data-glyph-h="111.4931640625" data-glyph-ascender="89.654296875" data-glyph-descender="-21.8388671875"/></g></svg>
+        </div>
+        <div class="col-7 align-self-center">
+            <form class="form-inline" method="get" action="./search-result.html" enctype="application/x-www-form-urlencoded">
+                <div class="input-group w-100">
+                    <input type="search" required placeholder="不追踪你的隐私" class="form-control">
+                    <div class="input-group-append">
+                        <button class="input-group-text btn btn-light bi bi-search" style="font-size: 1.2em">
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="offset-1 col-2">
+            <div class="dropdown text-right pt-2">
+                <button class="bi bi-list btn btn-light dropdown-toggle" data-toggle="dropdown" style="font-size: 1.5em"></button>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item" href="#">设为首页</a>
+                    <a class="dropdown-item" href="#">收录域名</a>
+                    <a class="dropdown-item" href="#">违法举报</a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="#">分享</a>
+                    <a class="dropdown-item" href="#">服务条款</a>
+                    <a class="dropdown-item" href="#">关于我们</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="offset-2 col-2">
+            <span style="color: grey; font-size: 14px">
+                &nbsp;本次搜索耗时0.3秒
+            </span>
+        </div>
+    </div>
+    <div class="row">
+        <div class="offset-2 col-8">
+            搜索结果
+        </div>
+    </div>
+    <div class="fixed-bottom">
+        <p class="text-center" style="color: darkgrey">© 2021 QUT Search www.qutsearch.com</p>
+    </div>
+</div>
+</body>
+</html>

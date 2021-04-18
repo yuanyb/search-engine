@@ -34,9 +34,8 @@ func (c *phraseSearchCursor) hasNextPos() bool {
 
 // 搜索结果
 type SearchResults struct {
-	Items      []*searchResultItem `json:"items"`
-	Suggestion string              `json:"suggestion,omitempty"`
-	Duration   int64               `json:"duration"` //  搜索耗时，毫秒
+	Items    []*searchResultItem `json:"items"`
+	Duration int64               `json:"duration"` //  搜索耗时，毫秒
 }
 
 func (s *SearchResults) Push(x interface{}) {
@@ -51,7 +50,7 @@ func (s *SearchResults) Pop() interface{} {
 
 func (s *SearchResults) Len() int { return len(s.Items) }
 
-func (s *SearchResults) Less(i, j int) bool { return s.Items[j].score < s.Items[i].score }
+func (s *SearchResults) Less(i, j int) bool { return s.Items[j].Score < s.Items[i].Score }
 
 func (s *SearchResults) Swap(i, j int) { s.Items[i], s.Items[j] = s.Items[j], s.Items[i] }
 
@@ -168,13 +167,13 @@ func (s *SearchResults) applyHighlight(db *db.IndexDB) {
 
 type searchResultItem struct {
 	docId          int
-	score          float64
 	titleHighlight [][2]int // 结果高亮
 	bodyHighlight  [][2]int
 	// 返回的数据
-	Url      string `json:"url"`
-	Title    string `json:"title"`
-	Abstract string `json:"abstract"`
+	Score    float64 `json:"score"`
+	Url      string  `json:"url"`
+	Title    string  `json:"title"`
+	Abstract string  `json:"abstract"`
 }
 
 func newSearcher(db *db.IndexDB, processor *textProcessor) *searcher {
@@ -252,7 +251,7 @@ func (s *searcher) searchDocs(query, site string) *SearchResults {
 			docsCount := s.db.GetDocumentsCount()
 			score := calcTfIdf(queryTokens, cursors, docsCount)
 			if phraseCount > 0 {
-				// 有完整短语权重更大，只要有完整短语，score 就至少3倍，凭感觉来的
+				// 有完整短语权重更大，只要有完整短语，Score 就至少3倍，凭感觉来的
 				score *= 3 + math.Log(float64(phraseCount))
 			}
 			if inTitle { // 标题中的词元权值更高
@@ -261,7 +260,7 @@ func (s *searcher) searchDocs(query, site string) *SearchResults {
 			} else {
 				item.bodyHighlight = highLight
 			}
-			item.score += score
+			item.Score += score
 		}
 		searchTitleOrBody(true)
 		searchTitleOrBody(false)

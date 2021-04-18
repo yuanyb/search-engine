@@ -7,12 +7,14 @@ import (
 	"github.com/shirou/gopsutil/mem"
 	"io"
 	"net/http"
+	"search-engine/crawler/config"
 	"search-engine/crawler/core"
 	"sync/atomic"
 	"time"
 )
 
 type MonitorInfo struct {
+	Addr         string  `json:"addr"`
 	MemTotal     int     `json:"mem_total"`
 	MemUsed      int     `json:"mem_used"`
 	CpuPercent   float64 `json:"cpu_percent"`
@@ -43,6 +45,7 @@ func Serve(e *core.CrawlerEngine) {
 
 func monitor(response http.ResponseWriter, request *http.Request) {
 	info := new(MonitorInfo)
+	info.Addr = config.GetLocal("crawler.addr")
 	// 获取操作系统信息
 	if m, err := mem.VirtualMemory(); err == nil {
 		info.MemTotal = int(m.Total)

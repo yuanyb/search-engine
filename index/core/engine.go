@@ -4,7 +4,6 @@ import (
 	"search-engine/index/config"
 	"search-engine/index/db"
 	"search-engine/index/util"
-	"strings"
 	"time"
 )
 
@@ -43,16 +42,6 @@ func (e *Engine) AddDocument(url, document string) {
 // 并发安全
 func (e *Engine) Search(query string) SearchResults {
 	var searchResults SearchResults
-	// 是否有非法关键词，邪教、黄色
-	if hasIllegalKeywords(query) {
-		return searchResults
-	}
-	// 搜索建议，纠错
-	if strings.IndexByte(query, ' ') == -1 {
-		if c, ok := suggest(query); ok {
-			searchResults.Suggestion = c
-		}
-	}
 	// 检索并合并结果
 	parsedQuery := parseQuery(query)
 	if len(parsedQuery.keywords) == 0 {
@@ -72,8 +61,8 @@ func (e *Engine) Search(query string) SearchResults {
 			return searchResults
 		}
 	}
-	// 仅返回30条结果
-	searchResults.Items = searchResults.Items[:util.MinInt(30, len(searchResults.Items))]
+	// 每个索引服务器最多仅返回 100 / index_server_count 条结果
+	searchResults.Items = searchResults.Items[:util.MinInt(50, len(searchResults.Items))]
 	// 获取文档信息及高亮结果
 	searchResults.applyHighlight(e.DB)
 	return searchResults

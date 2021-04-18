@@ -12,7 +12,6 @@ import (
 	"os"
 	"search-engine/index/config"
 	"search-engine/index/core"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -31,6 +30,7 @@ type Response struct {
 }
 
 type MonitorInfo struct {
+	Addr                        string  `json:"addr"`
 	MemTotal                    int     `json:"mem_total"`
 	MemUsed                     int     `json:"mem_used"`
 	CpuPercent                  float64 `json:"cpu_percent"`
@@ -43,13 +43,13 @@ type MonitorInfo struct {
 	DocUrlBufferHitRate         float64 `json:"doc_url_buffer_hit_rate"`
 }
 
-func Serve(port int) {
+func Serve(listenAddr string) {
 	engine = core.NewEngine()
 	http.HandleFunc("/search", searchHandler)
 	// 该接口不应该暴露出去，为了方便忽略了
 	http.HandleFunc("/index", indexHandler)
 	http.HandleFunc("/monitor", monitor)
-	err := http.ListenAndServe(":"+strconv.Itoa(port), nil)
+	err := http.ListenAndServe(listenAddr, nil)
 	log.Fatal(err)
 }
 
@@ -66,7 +66,7 @@ func searchHandler(writer http.ResponseWriter, request *http.Request) {
 	start := time.Now()
 	searchResults := engine.Search(query)
 	searchResults.Duration = time.Now().Sub(start).Milliseconds()
-	write(writer, http.StatusOK, searchResults)
+	write(writer, http.StatusOK, &Response{Code: codeSuccess, Data: searchResults})
 }
 
 func indexHandler(writer http.ResponseWriter, request *http.Request) {
@@ -96,6 +96,7 @@ func indexHandler(writer http.ResponseWriter, request *http.Request) {
 
 func monitor(writer http.ResponseWriter, request *http.Request) {
 	info := new(MonitorInfo)
+	info.Addr = config.Get("crawler.addr")
 	// 获取操作系统信息
 	if m, err := mem.VirtualMemory(); err == nil {
 		info.MemTotal = int(m.Total)
