@@ -240,6 +240,7 @@ func (s *searcher) searchDocs(query, site string) *SearchResults {
 		if site != "" {
 			u := s.db.GetDocumentUrl(baseDocId)
 			if !strings.HasSuffix(util.UrlToHost(u), site) {
+				cursors[0] = cursors[0].next
 				continue
 			}
 		}

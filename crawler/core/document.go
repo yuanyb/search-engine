@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"regexp"
 	"search-engine/crawler/config"
@@ -53,8 +54,10 @@ func SendDocument(url, document string) {
 			"document": document,
 		})
 		retryCount := config.Get().RetryCount
+		addrList := indexerAddrList.Load().([]string)
+		indexerAddr := addrList[rand.Intn(len(addrList))]
 		for i := 0; i < retryCount+1; i++ {
-			req, _ := http.NewRequest("PUT", config.GetLocal("indexer.addr"), bytes.NewReader(j))
+			req, _ := http.NewRequest("PUT", indexerAddr+"/index", bytes.NewReader(j))
 			_, err := http.DefaultClient.Do(req)
 			if err == nil {
 				break

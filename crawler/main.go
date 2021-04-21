@@ -27,6 +27,7 @@ func registerSelf() {
 		}
 	}()
 }
+
 func main() {
 	defer func() {
 		// 退出时移除自己
@@ -37,6 +38,7 @@ func main() {
 		panic("goroutineCount format error")
 	}
 
+	core.InitCron()
 	engine := core.NewCrawlerEngine(
 		core.NewBFScheduler(),
 		core.GlobalDl,

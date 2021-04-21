@@ -1,12 +1,16 @@
 package core
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"math/rand"
 	"net"
 	"net/url"
 	"search-engine/crawler/config"
+	"search-engine/crawler/db"
 	"search-engine/crawler/util"
+	"strconv"
 	"sync/atomic"
 	"time"
 )
@@ -37,6 +41,37 @@ type CrawlerEngine struct {
 type UrlGroup struct {
 	Leader  string
 	Members []string
+}
+
+var indexerAddrList atomic.Value
+
+func InitCron() {
+	initDone := make(chan struct{})
+	// 索引服务器地址
+	go func() {
+		initialized := false
+		for {
+			if r, err := db.Redis.HGetAll(context.Background(), "indexer.addr").Result(); err != nil {
+				addrList := make([]string, 0, len(r))
+				for addr, heartbeatTime := range r {
+					t, _ := strconv.Atoi(heartbeatTime)
+					// 40秒内认为存活
+					if time.Now().Unix()-int64(t) < 40 {
+						addrList = append(addrList, addr)
+					}
+				}
+				indexerAddrList.Store(addrList)
+			} else {
+				log.Println("获取索引服务器地址失败：" + err.Error())
+			}
+			if !initialized {
+				initialized = true
+				initDone <- struct{}{}
+			}
+		}
+	}()
+	<-initDone
+	close(initDone)
 }
 
 func (e *CrawlerEngine) startCrawlerGoroutine() {

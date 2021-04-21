@@ -2,7 +2,6 @@ package service
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -21,7 +20,7 @@ type response struct {
 }
 
 // 获取服务器的监控信息
-func Monitor(writer http.ResponseWriter, request *http.Request) {
+func MonitorHandler(writer http.ResponseWriter, request *http.Request) {
 	if !checkLogin(request) {
 		writeJson(writer, http.StatusBadRequest, &response{Code: codeFail, Msg: "未登录"})
 		return
@@ -54,15 +53,26 @@ func Monitor(writer http.ResponseWriter, request *http.Request) {
 	})
 }
 
-// 从 redis 中移除（索引、爬虫）服务器地址
-func RemoveServer(writer http.ResponseWriter, request *http.Request) {
-	if !checkLogin(request) {
-		writeJson(writer, http.StatusBadRequest, &response{Code: codeFail, Msg: "未登录"})
+func GetCrawlerConfigHandler(writer http.ResponseWriter, request *http.Request) {
+	conf, err := db.Mysql.GetCrawlerConfig()
+	if err != nil {
+		writeJson(writer, http.StatusBadRequest, &response{
+			Code: codeFail,
+			Msg:  "获取失败",
+		})
 		return
 	}
-	addr := request.FormValue("addr")
-	target := request.FormValue("target")
-	if len(addr) == 0 || len(target) == 0 || (target != "crawler" && target != "indexer") {
+	writeJson(writer, http.StatusBadRequest, &response{
+		Code: codeSuccess,
+		Data: conf,
+	})
+}
+
+// 修改爬虫配置
+func UpdateCrawlerConfigHandler(writer http.ResponseWriter, request *http.Request) {
+	name := strings.TrimSpace(request.FormValue("name"))
+	value := strings.TrimSpace(request.FormValue("value"))
+	if name == "" || value == "" {
 		writeJson(writer, http.StatusBadRequest, &response{
 			Code: codeFail,
 			Msg:  "参数错误",
@@ -70,22 +80,19 @@ func RemoveServer(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	var j []byte
-	if _, err := db.Redis.SRem(context.Background(), target+".addr", addr).Result(); err != nil {
-		writeJson(writer, http.StatusInternalServerError, &response{
+	err := db.Mysql.UpdateCrawlerConfig(name, value)
+	if err != nil {
+		writeJson(writer, http.StatusBadRequest, &response{
 			Code: codeFail,
-			Msg:  "移除失败",
+			Msg:  "修改失败",
 		})
 		return
 	}
-	j, _ = json.Marshal(&response{
-		Code: codeSuccess,
-	})
-	_, _ = writer.Write(j)
+	writeJson(writer, http.StatusBadRequest, &response{Code: codeSuccess})
 }
 
 // 获取非法关键词
-func GetIllegalKeyword(writer http.ResponseWriter, request *http.Request) {
+func GetIllegalKeywordHandler(writer http.ResponseWriter, request *http.Request) {
 	if !checkLogin(request) {
 		writeJson(writer, http.StatusBadRequest, &response{Code: codeFail, Msg: "未登录"})
 		return
@@ -104,7 +111,7 @@ func GetIllegalKeyword(writer http.ResponseWriter, request *http.Request) {
 }
 
 // 管理非法关键词
-func ManageIllegalKeyword(writer http.ResponseWriter, request *http.Request) {
+func ManageIllegalKeywordHandler(writer http.ResponseWriter, request *http.Request) {
 	if !checkLogin(request) {
 		writeJson(writer, http.StatusBadRequest, &response{Code: codeFail, Msg: "未登录"})
 		return
@@ -146,7 +153,7 @@ func ManageIllegalKeyword(writer http.ResponseWriter, request *http.Request) {
 	})
 }
 
-func GetDomainBlacklist(writer http.ResponseWriter, request *http.Request) {
+func GetDomainBlacklistHandler(writer http.ResponseWriter, request *http.Request) {
 	blacklist, err := db.Mysql.GetDomainBlacklist()
 	if err != nil {
 		writeJson(writer, http.StatusInternalServerError, &response{
@@ -161,7 +168,7 @@ func GetDomainBlacklist(writer http.ResponseWriter, request *http.Request) {
 }
 
 // 管理域名黑名单
-func ManageDomainBlacklist(writer http.ResponseWriter, request *http.Request) {
+func ManageDomainBlacklistHandler(writer http.ResponseWriter, request *http.Request) {
 	if !checkLogin(request) {
 		writeJson(writer, http.StatusBadRequest, &response{Code: codeFail, Msg: "未登录"})
 		return
@@ -211,7 +218,7 @@ func ManageDomainBlacklist(writer http.ResponseWriter, request *http.Request) {
 }
 
 // 收录域名
-func IncludeDomain(writer http.ResponseWriter, request *http.Request) {
+func IncludeDomainHandler(writer http.ResponseWriter, request *http.Request) {
 	if !checkLogin(request) {
 		writeJson(writer, http.StatusBadRequest, &response{Code: codeFail, Msg: "未登录"})
 		return
@@ -251,7 +258,7 @@ func IncludeDomain(writer http.ResponseWriter, request *http.Request) {
 
 const salt = "QUT-SeArCh"
 
-func Login(writer http.ResponseWriter, request *http.Request) {
+func LoginHandler(writer http.ResponseWriter, request *http.Request) {
 	username := strings.TrimSpace(request.FormValue("username"))
 	password := strings.TrimSpace(request.FormValue("password"))
 	if username == "" || password == "" {

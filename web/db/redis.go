@@ -5,7 +5,8 @@ import (
 	"search-engine/web/config"
 )
 
-var Redis = NewRedis()
+var CenterRedis = NewRedis()
+var CacheRedis = CenterRedis
 
 func NewRedis() *redis.Client {
 	rdb := redis.NewClient(&redis.Options{

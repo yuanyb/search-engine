@@ -10,7 +10,7 @@ import (
 
 // 本地配置项必须提供
 var localConfigItem = [...]string{"mysql.username", "mysql.password", "mysql.host",
-	"mysql.port", "mysql.dbname", "redis.addr", "crawler.addr", "indexer.addr"}
+	"mysql.port", "mysql.dbname", "redis.addr"}
 
 var config map[string]string
 

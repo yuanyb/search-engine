@@ -10,13 +10,15 @@ import (
 )
 
 type MysqlDB struct {
-	db                 *sql.DB
-	getIllegalKeywords *sql.Stmt
-	addIllegalKeywords *sql.Stmt
-	delIllegalKeyword  *sql.Stmt
-	getDomainBlackList *sql.Stmt
-	delDomain          *sql.Stmt
-	login              *sql.Stmt
+	db                  *sql.DB
+	getIllegalKeywords  *sql.Stmt
+	addIllegalKeywords  *sql.Stmt
+	delIllegalKeyword   *sql.Stmt
+	getDomainBlackList  *sql.Stmt
+	delDomain           *sql.Stmt
+	login               *sql.Stmt
+	updateCrawlerConfig *sql.Stmt
+	getCrawlerConfig    *sql.Stmt
 }
 
 type MysqlDBOptions struct {
@@ -64,6 +66,12 @@ func NewMysqlDB(options *MysqlDBOptions) *MysqlDB {
 	mysqlDB.login, err = db.Prepare("select count(*) > 0 from admin where `username` = ? and `password` = ?")
 	checkDBInitError(err)
 
+	//
+	mysqlDB.updateCrawlerConfig, err = db.Prepare("replace into crawler(name, value) values(?, ?)")
+	checkDBInitError(err)
+
+	mysqlDB.getCrawlerConfig, err = db.Prepare("select `name`, `value` from `crawler`")
+	checkDBInitError(err)
 	return mysqlDB
 }
 
@@ -151,4 +159,26 @@ func (db *MysqlDB) Login(username, password string) (bool, error) {
 		return false, err
 	}
 	return b, nil
+}
+
+func (db *MysqlDB) UpdateCrawlerConfig(name, value string) error {
+	_, err := db.updateCrawlerConfig.Exec(name, value)
+	return err
+}
+
+func (db *MysqlDB) GetCrawlerConfig() (map[string]string, error) {
+	conf := make(map[string]string)
+	rows, err := db.getCrawlerConfig.Query()
+	if err != nil {
+		return nil, err
+	}
+	var name, value string
+	for rows.Next() {
+		err = rows.Scan(&name, &value)
+		if err != nil {
+			return nil, err
+		}
+		conf[name] = value
+	}
+	return conf, nil
 }

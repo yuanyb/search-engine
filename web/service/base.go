@@ -54,7 +54,7 @@ func initCron() {
 		initialized := false
 		for {
 			// 索引服务器地址
-			if r, err := db.Redis.HGetAll(ctx, "indexer.addr").Result(); err != nil {
+			if r, err := db.CenterRedis.HGetAll(ctx, "indexer.addr").Result(); err == nil {
 				addrList := make([]string, 0, len(r))
 				for addr, heartbeatTime := range r {
 					t, _ := strconv.Atoi(heartbeatTime)
@@ -68,7 +68,7 @@ func initCron() {
 				log.Println("获取索引服务器地址失败：" + err.Error())
 			}
 			// 爬虫服务器地址
-			if r, err := db.Redis.HGetAll(ctx, "crawler.addr").Result(); err != nil {
+			if r, err := db.CenterRedis.HGetAll(ctx, "crawler.addr").Result(); err == nil {
 				addrList := make([]string, 0, len(r))
 				for addr, heartbeatTime := range r {
 					t, _ := strconv.Atoi(heartbeatTime)

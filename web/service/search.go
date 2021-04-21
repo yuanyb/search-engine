@@ -52,7 +52,7 @@ func hasIllegalKeywords(query string) bool {
 // 从缓存中获取搜索结果
 func getFromCache(query string, pn int) (*searchResult, error) {
 	result := new(searchResult)
-	r, err := db.Redis.LRange(ctx, query, int64((pn-1)*10), int64((pn-1)*10+10)).Result()
+	r, err := db.CacheRedis.LRange(ctx, query, int64((pn-1)*10), int64((pn-1)*10+10)).Result()
 	if err != nil {
 		if err == redis.Nil {
 			return nil, nil
@@ -78,7 +78,7 @@ func addToCache(query string, items []*searchResultItem) {
 		itemStrList = append(itemStrList, j)
 	}
 
-	pipeline := db.Redis.Pipeline()
+	pipeline := db.CacheRedis.Pipeline()
 	pipeline.RPush(ctx, query, itemStrList...)
 	pipeline.Expire(ctx, query, time.Hour*12)
 	if _, err := pipeline.Exec(ctx); err != nil {
