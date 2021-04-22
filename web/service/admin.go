@@ -13,31 +13,26 @@ import (
 	"strings"
 )
 
-type response struct {
-	Code int         `json:"code"`
-	Msg  string      `json:"msg"`
-	Data interface{} `json:"data"`
-}
-
 // 获取服务器的监控信息
 func MonitorHandler(writer http.ResponseWriter, request *http.Request) {
 	if !checkLogin(request) {
 		writeJson(writer, http.StatusBadRequest, &response{Code: codeFail, Msg: "未登录"})
 		return
 	}
-	// todo 是否登录
 	result := make(map[string]interface{}, 2)
 	f := func(addrList []string, key string) {
 		result[key] = requestServerList(addrList, func(channel chan<- interface{}, addr string) {
 			resp, err := http.Get(fmt.Sprintf("%s/monitor", addr))
 			if err != nil {
 				log.Println(err)
+				channel <- nil
 				return
 			}
 
 			j, err := simplejson.NewFromReader(resp.Body)
 			if err != nil {
 				log.Println("获取服务器负载失败", err)
+				channel <- nil
 				return
 			}
 

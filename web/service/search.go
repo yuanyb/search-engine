@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/bitly/go-simplejson"
-	"github.com/go-redis/redis/v8"
 	"log"
 	"net/http"
+	"net/url"
 	"search-engine/web/db"
 	"search-engine/web/util"
 	"sort"
@@ -18,6 +18,9 @@ import (
 
 var ctx = context.Background()
 
+// 结果项的 url 都是绝对链接，所以为空即可
+var baseURL, _ = url.Parse("nil.com")
+
 // 响应代码
 const (
 	codeSuccess = iota
@@ -25,10 +28,11 @@ const (
 )
 
 type searchResultItem struct {
-	Url      string  `json:"url"`
-	Title    string  `json:"title"`
-	Abstract string  `json:"abstract"`
-	Score    float64 `json:"score"`
+	Url          string  `json:"url"`
+	Title        string  `json:"title"`
+	Abstract     string  `json:"abstract"`
+	Score        float64 `json:"score"`
+	AnonymousUrl string  `json:"-"`
 }
 
 type searchResult struct {
@@ -52,19 +56,26 @@ func hasIllegalKeywords(query string) bool {
 // 从缓存中获取搜索结果
 func getFromCache(query string, pn int) (*searchResult, error) {
 	result := new(searchResult)
-	r, err := db.CacheRedis.LRange(ctx, query, int64((pn-1)*10), int64((pn-1)*10+10)).Result()
-	if err != nil {
-		if err == redis.Nil {
-			return nil, nil
-		}
+	// 因为 lrange 命令无法不存在的 key 返回 redis.Nil，所以要判断一下 key 是否存在
+	pipeline := db.CacheRedis.Pipeline()
+	defer pipeline.Close()
+	p1 := pipeline.Exists(ctx, query)
+	p2 := pipeline.LRange(ctx, query, int64((pn-1)*10), int64((pn-1)*10+9))
+	_, err := pipeline.Exec(ctx)
+	if err != nil || p1.Err() != nil || p2.Err() != nil {
 		return nil, err
+	} else if p1.Val() == 0 {
+		// 从索引服务器中检索
+		return nil, nil
 	}
-	for _, itemStr := range r {
+
+	for _, itemStr := range p2.Val() {
 		item := new(searchResultItem)
 		err = json.Unmarshal([]byte(itemStr), item)
 		if err != nil {
 			continue
 		}
+		item.AnonymousUrl, _ = convertToProxyURL(baseURL, item.AnonymousUrl)
 		result.Items = append(result.Items, item)
 	}
 	return result, nil
@@ -72,7 +83,10 @@ func getFromCache(query string, pn int) (*searchResult, error) {
 
 // 将搜索结果添加到缓存
 func addToCache(query string, items []*searchResultItem) {
-	itemStrList := make([]interface{}, len(items))
+	if len(items) == 0 {
+		return
+	}
+	itemStrList := make([]interface{}, 0, len(items))
 	for _, item := range items {
 		j, _ := json.Marshal(item)
 		itemStrList = append(itemStrList, j)
@@ -90,14 +104,16 @@ func addToCache(query string, items []*searchResultItem) {
 func getFromIndexServer(query string) *searchResult {
 	addrList := indexerAddrList.Load().([]string)
 	resultList := requestServerList(addrList, func(channel chan<- interface{}, addr string) {
-		resp, err := http.Get(fmt.Sprintf("%s/search?query=%s", addr, query))
+		resp, err := http.Get(fmt.Sprintf("http://%s/search?query=%s", addr, query))
 		if err != nil {
+			channel <- nil
 			log.Println(err)
 			return
 		}
 
 		j, err := simplejson.NewFromReader(resp.Body)
 		if err != nil {
+			channel <- nil
 			log.Println(err)
 			return
 		} else if j.Get("code").MustInt() != codeSuccess {
@@ -106,9 +122,16 @@ func getFromIndexServer(query string) *searchResult {
 		}
 
 		var items []*searchResultItem
-		for _, item := range j.Get("data").Get("Items").MustArray() {
-			t := item.(searchResultItem)
-			items = append(items, &t)
+		for _, item := range j.Get("data").Get("items").MustArray() {
+			it := item.(map[string]interface{})
+			score, _ := it["score"].(json.Number).Float64()
+			t := &searchResultItem{
+				Url:      it["url"].(string),
+				Title:    it["title"].(string),
+				Abstract: it["abstract"].(string),
+				Score:    score,
+			}
+			items = append(items, t)
 		}
 		channel <- items
 	})
@@ -126,7 +149,7 @@ func Search(writer http.ResponseWriter, request *http.Request) {
 	pn := 1
 	query := strings.TrimSpace(request.FormValue("query"))
 	if strings.TrimSpace(query) == "" {
-		servePage(writer, "search-result.html", http.StatusOK, &searchResult{
+		servePage(writer, "search-result.gohtml", http.StatusOK, &searchResult{
 			Info: "查询内容为空",
 		})
 		return
@@ -134,10 +157,14 @@ func Search(writer http.ResponseWriter, request *http.Request) {
 	if i, err := strconv.Atoi(request.FormValue("pn")); err == nil {
 		pn = i
 	}
+	if pn >= 11 {
+		servePage(writer, "search-result.gohtml", http.StatusOK, &searchResult{Info: "查询内容为空"})
+		return
+	}
 
 	// query 处理
 	if hasIllegalKeywords(query) {
-		servePage(writer, "search-result.html", http.StatusOK, &searchResult{
+		servePage(writer, "search-result.gohtml", http.StatusOK, &searchResult{
 			Info: "搜索内容含有非法关键词",
 		})
 		return
@@ -148,7 +175,8 @@ func Search(writer http.ResponseWriter, request *http.Request) {
 		log.Println("从缓存获取结果时错误", err)
 	} else if r != nil {
 		r.Duration = time.Now().Sub(begin).Seconds()
-		servePage(writer, "search-result.html", http.StatusOK, r)
+		r.Query = query
+		servePage(writer, "search-result.gohtml", http.StatusOK, r)
 		return
 	}
 
@@ -157,11 +185,19 @@ func Search(writer http.ResponseWriter, request *http.Request) {
 	sort.Slice(result.Items, func(i, j int) bool { // 按 score 降序排序
 		return result.Items[i].Score > result.Items[j].Score
 	})
+	result.Items = result.Items[(pn-1)*10 : util.MinInt((pn-1)*10+10, len(result.Items))]
+
 	// 异步添加到缓存
 	go addToCache(query, result.Items)
 
-	// 返回
-	result.Items = result.Items[(pn-1)*10 : util.MinInt((pn-1)*10+10, len(result.Items))]
+	for _, item := range result.Items {
+		item.AnonymousUrl, _ = convertToProxyURL(baseURL, item.Url)
+	}
 	result.Duration = time.Now().Sub(begin).Seconds()
-	servePage(writer, "search-result.html", http.StatusOK, result)
+	result.Query = query
+	servePage(writer, "search-result.gohtml", http.StatusOK, result)
+}
+
+func Index(writer http.ResponseWriter, request *http.Request) {
+	tmpl.Lookup("index.html").Execute(writer, nil)
 }

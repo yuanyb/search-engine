@@ -14,6 +14,12 @@ import (
 	"time"
 )
 
+type response struct {
+	Code int         `json:"code"`
+	Msg  string      `json:"msg"`
+	Data interface{} `json:"data"`
+}
+
 func init() {
 	initCron()
 	initTemplate()
@@ -23,7 +29,7 @@ var (
 	illegalKeywords []string
 	indexerAddrList atomic.Value
 	crawlerAddrList atomic.Value
-	tpl             *template.Template
+	tmpl            *template.Template
 )
 
 // 定时任务协程
@@ -77,7 +83,7 @@ func initCron() {
 						addrList = append(addrList, addr)
 					}
 				}
-				indexerAddrList.Store(addrList)
+				crawlerAddrList.Store(addrList)
 			} else {
 				log.Println("获取爬虫服务器地址失败：" + err.Error())
 			}
@@ -92,14 +98,22 @@ func initCron() {
 }
 
 func initTemplate() {
-	t, err := template.ParseGlob("./template/*.html")
+	unescapeHTML := func(str string) interface{} {
+		return template.HTML(str)
+	}
+	tmpl = template.New("tmpl")
+	tmpl.Funcs(template.FuncMap{
+		"unescapeHTML": unescapeHTML,
+	})
+	t, err := tmpl.ParseGlob("./template/*html")
 	if err != nil {
 		log.Fatalln(err)
 	}
-	tpl = t
+	tmpl = t
 }
 
 // 请求服务器地址列表中的每个地址，并获得返回结果
+// f 执行成功向 channel 发送一个值，失败向 channel 发送 nil
 func requestServerList(addrList []string, f func(channel chan<- interface{}, addr string)) []interface{} {
 	resultChannel := make(chan interface{}, len(addrList))
 	// 启动 len(addrList) 个 goroutine 访问检索服务器检索
@@ -108,22 +122,27 @@ func requestServerList(addrList []string, f func(channel chan<- interface{}, add
 	}
 
 	// 从 resultChannel 中获取结果
-	result := make([]interface{}, len(addrList))
-	deadline := time.Now().Add(time.Second * 3).UnixNano() // 截止时间戳
-	for time.Now().UnixNano() < deadline {
+	result := make([]interface{}, 0, len(addrList))
+	// 截止时间戳
+	deadline := time.Now().Add(time.Second * 3).UnixNano()
+	// len(result) < len(addrList) 是为了不每次都等 3s
+	for time.Now().UnixNano() < deadline && len(result) < len(addrList) {
 		select {
 		case r := <-resultChannel:
-			result = append(result, r)
-		case <-time.After(time.Duration(deadline - time.Now().UnixNano())): // 到 deadline 的剩余时间
+			if r != nil {
+				result = append(result, r)
+			}
+		case <-time.After(time.Duration(deadline - time.Now().UnixNano())):
+			// 到 deadline 的剩余时间
 		}
 	}
 	return result
 }
 
-func servePage(writer http.ResponseWriter, tplName string, statusCode int, data interface{}) {
+func servePage(writer http.ResponseWriter, tmplName string, statusCode int, data interface{}) {
 	writer.WriteHeader(statusCode)
-	if err := tpl.Lookup(tplName).Execute(writer, data); err != nil {
-		log.Printf("模板[%s]执行时发生错误：%s\n", tplName, err)
+	if err := tmpl.Lookup(tmplName).Execute(writer, data); err != nil {
+		log.Printf("模板[%s]执行时发生错误：%s\n", tmplName, err)
 	}
 }
 

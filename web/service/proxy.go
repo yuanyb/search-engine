@@ -39,7 +39,7 @@ var (
 	charsetPattern          = regexp.MustCompile(`(?i)charset=[\w\d\- ]+;?`)
 	cssUrlPattern           = regexp.MustCompile(`(?im)url\(['"]?(.+?)['"]?\)`)
 
-	bodyBanner       = []byte(`<div style="background-color: darkgrey; color:whitesmoke; font-size:medium; border-style: ridge; z-index:999; position: sticky; top:0; left:0; right:0; text-align: center; padding: 5px;">您正通过隐私代理服务器匿名访问当前网页，您的行为时完全私密的（浏览器和服务器不会记录您的状态信息，但浏览器可能会保存浏览记录）。由于对当前网页禁用了脚本，所以有些网站会显示异常。</div>`)
+	bodyBanner       = []byte(`<div style="background-color: darkgrey; color:whitesmoke; font-size:medium; border-style: ridge; z-index:999999; position: sticky; top:0; left:0; right:0; text-align: center; padding: 5px;">您正通过隐私代理服务器匿名访问当前网页，您的行为时完全私密的（浏览器和服务器不会记录您的状态信息，但浏览器可能会保存浏览记录）。由于对当前网页禁用了脚本，所以有些网站会显示异常。</div>`)
 	formInjection, _ = template.New("form_injection").Parse(`<input type="hidden" name="url" value="{{.url}}" /><input type="hidden" name="key" value="{{.key}}"/>`)
 
 	// https://en.wikipedia.org/wiki/HTML_sanitization
@@ -222,7 +222,7 @@ func convertToProxyURL(baseURL *url.URL, rawURL string) (string, bool) {
 	parsedURL = baseURL.ResolveReference(parsedURL)
 
 	u := parsedURL.String()
-	return fmt.Sprintf("./?url=%s&key=%s%s", url.QueryEscape(u), hex.EncodeToString(hash(u)), fragment), true
+	return fmt.Sprintf("/proxy?url=%s&key=%s%s", url.QueryEscape(u), hex.EncodeToString(hash(u)), fragment), true
 }
 
 func sanitizeHTML(writer io.Writer, baseURL *url.URL, body []byte) {
