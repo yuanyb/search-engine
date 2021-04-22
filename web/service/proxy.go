@@ -36,11 +36,11 @@ var (
 	hashKey                 = []byte("QUT_SeArCh")
 	httpClient              = http.Client{Timeout: time.Second * 3}
 	allowedContentTypeFlags = []string{"html", "css", "image", "plain", "font"}
-	charsetPattern          = regexp.MustCompile(`(?i)charset=[\w\d- ]+?;?`)
+	charsetPattern          = regexp.MustCompile(`(?i)charset=[\w\d\- ]+;?`)
 	cssUrlPattern           = regexp.MustCompile(`(?im)url\(['"]?(.+?)['"]?\)`)
 
-	bodyBanner       = []byte(`<div style="background-color: darkgrey; color:whitesmoke; border-style: ridge; position: sticky; top:0; left:0; right:0; text-align: center; padding: 5px;">您现在正通过代理服务器匿名访问当前网页，您的行为时完全私密的（除了浏览器会保存浏览记录）。由于对当前网页禁用了脚本，所以有些网站会显示异常。请不要在网页内输入提交任何可能泄露您的隐私的内容。</div>`)
-	formInjection, _ = template.New("form_injection").Parse(`<input type="hidden" name="url" value="{{.url}}" /><input type="hidden" name="url_hash" value="{{.url_hash}}"/>`)
+	bodyBanner       = []byte(`<div style="background-color: darkgrey; color:whitesmoke; font-size:medium; border-style: ridge; z-index:999; position: sticky; top:0; left:0; right:0; text-align: center; padding: 5px;">您正通过隐私代理服务器匿名访问当前网页，您的行为时完全私密的（浏览器和服务器不会记录您的状态信息，但浏览器可能会保存浏览记录）。由于对当前网页禁用了脚本，所以有些网站会显示异常。</div>`)
+	formInjection, _ = template.New("form_injection").Parse(`<input type="hidden" name="url" value="{{.url}}" /><input type="hidden" name="key" value="{{.key}}"/>`)
 
 	// https://en.wikipedia.org/wiki/HTML_sanitization
 	// https://docs.servicenow.com/bundle/quebec-platform-administration/page/administer/security/concept/c_HTMLSanitizer.html
@@ -101,29 +101,39 @@ var (
 
 func ProxyHandler(writer http.ResponseWriter, request *http.Request) {
 	_url := request.FormValue("url")
-	urlHash, err := hex.DecodeString(request.FormValue("url_hash"))
+	key, err := hex.DecodeString(request.FormValue("key"))
 	// 验证 hash
-	if err != nil || !hmac.Equal(hash(_url), urlHash) {
+	if err != nil || !hmac.Equal(hash(_url), key) {
 		serveFailedPage(writer, http.StatusForbidden, "参数验证失败")
 		return
 	}
-	// todo 百度搜索不行
+
+	// 复制 get 请求的参数
+	request.Form.Del("url")
+	request.Form.Del("key")
+	params := request.Form.Encode()
+	if strings.IndexByte(_url, '?') != -1 {
+		_url = fmt.Sprintf("%s&%s", _url, params)
+	} else {
+		_url = fmt.Sprintf("%s?%s", _url, params)
+	}
+
 	process(writer, request, _url, 0)
 }
 
-func process(writer http.ResponseWriter, request *http.Request, rawUrl string, redirectCount int) {
+func process(writer http.ResponseWriter, srcReq *http.Request, rawUrl string, redirectCount int) {
 	parsedURL, err := url.Parse(rawUrl)
 	if err != nil {
 		serveFailedPage(writer, http.StatusInternalServerError, "访问目标网页失败")
 		return
 	}
-	// 构造请求，忽略用户端带来的 http header，以达到保护隐私的效果
-	req, err := http.NewRequest(request.Method, rawUrl, request.Body)
+
+	req, err := http.NewRequest(srcReq.Method, rawUrl, srcReq.Body)
 	if err != nil {
 		serveFailedPage(writer, http.StatusInternalServerError, "内部错误")
 		return
 	}
-	copyRequestInfo(req, request)
+	copyRequestHeader(req, srcReq)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -140,7 +150,7 @@ func process(writer http.ResponseWriter, request *http.Request, rawUrl string, r
 				break
 			}
 			if redirectCount < maxRedirectCount {
-				process(writer, request, rawUrl, redirectCount+1)
+				process(writer, srcReq, rawUrl, redirectCount+1)
 			} else {
 				serveFailedPage(writer, http.StatusInternalServerError, "重定向次数过多")
 			}
@@ -150,18 +160,31 @@ func process(writer http.ResponseWriter, request *http.Request, rawUrl string, r
 		return
 	}
 
+	// 读取响应
 	body, err := readBody(writer, resp)
 	if err != nil {
 		return
 	}
 
+	// 向客户端返回 gzip 压缩过的数据
+	var gzipWriter io.Writer
+	if strings.Contains(srcReq.Header.Get("Accept-Encoding"), "gzip") {
+		writer.Header().Set("Content-Encoding", "gzip")
+		w := gzip.NewWriter(writer)
+		defer w.Close()
+		gzipWriter = w
+	} else {
+		gzipWriter = writer
+	}
+
+	// sanitize
 	ct := resp.Header.Get("Content-Type")
 	if strings.Contains(ct, "html") {
-		sanitizeHTML(writer, parsedURL, body)
+		sanitizeHTML(gzipWriter, parsedURL, body)
 	} else if strings.Contains(ct, "css") {
-		sanitizeCSS(writer, parsedURL, body)
+		sanitizeCSS(gzipWriter, parsedURL, body)
 	} else {
-		_, _ = writer.Write(body)
+		_, _ = gzipWriter.Write(body)
 	}
 }
 
@@ -199,10 +222,10 @@ func convertToProxyURL(baseURL *url.URL, rawURL string) (string, bool) {
 	parsedURL = baseURL.ResolveReference(parsedURL)
 
 	u := parsedURL.String()
-	return fmt.Sprintf("./?url_hash=%s&url=%s%s", hex.EncodeToString(hash(u)), url.QueryEscape(u), fragment), true
+	return fmt.Sprintf("./?url=%s&key=%s%s", url.QueryEscape(u), hex.EncodeToString(hash(u)), fragment), true
 }
 
-func sanitizeHTML(writer http.ResponseWriter, baseURL *url.URL, body []byte) {
+func sanitizeHTML(writer io.Writer, baseURL *url.URL, body []byte) {
 	tokenizer := html.NewTokenizer(bytes.NewReader(body))
 	tokenizer.AllowCDATA(true)
 	localUnsafeElements := make([][]byte, 0)
@@ -211,7 +234,7 @@ func sanitizeHTML(writer http.ResponseWriter, baseURL *url.URL, body []byte) {
 		token := tokenizer.Next()
 		if token == html.ErrorToken {
 			if tokenizer.Err() != io.EOF {
-				serveFailedPage(writer, http.StatusInternalServerError, "目标网页无法解析")
+				_, _ = writer.Write([]byte("目标网页无法解析"))
 			}
 			break
 		}
@@ -270,7 +293,7 @@ func sanitizeHTML(writer http.ResponseWriter, baseURL *url.URL, body []byte) {
 
 				// 向页面注入额外的内容
 				if bytes.Equal(tagName, []byte("form")) {
-					// 处理 form 标签，重写 url、添加隐藏参数 url_hash
+					// 处理 form 标签，重写 url、添加隐藏参数 key
 					var action *url.URL
 					for _, attr := range attrs {
 						if bytes.Equal(attr[0], []byte("action")) {
@@ -283,7 +306,7 @@ func sanitizeHTML(writer http.ResponseWriter, baseURL *url.URL, body []byte) {
 						action = baseURL
 					}
 					u := action.String()
-					_ = formInjection.Execute(writer, map[string]string{"url": u, "url_hash": hex.EncodeToString(hash(u))})
+					_ = formInjection.Execute(writer, map[string]string{"url": u, "key": hex.EncodeToString(hash(u))})
 				} else if bytes.Equal(tagName, []byte("body")) {
 					_, _ = writer.Write(bodyBanner)
 				}
@@ -409,8 +432,8 @@ func sanitizeAttrs(writer io.Writer, baseURL *url.URL, attrs [][][]byte) {
 				fmt.Fprintf(writer, ` %s="%s" `, attr[0], proxyURL)
 			}
 		case "action":
-			// 因为已经向 form 标签注入过 url、url_hash 参数了，所以 action 为 "/" 就行
-			writer.Write([]byte(`action="/"`))
+			// 因为已经向 form 标签注入过 url、key 参数了，所以 action 为 "/" 就行
+			writer.Write([]byte(` action="/" `))
 		case "style":
 			styleValueBuffer := new(bytes.Buffer)
 			sanitizeCSS(styleValueBuffer, baseURL, attr[1])
@@ -448,18 +471,14 @@ func contentTypeAllow(contentType string) bool {
 }
 
 // 将客户端中的部分请求头参数拷贝到新的代理请求中
-func copyRequestInfo(destReq, srcReq *http.Request) {
-	// get-param
-	if srcReq.Method == http.MethodGet {
-		header := srcReq.Header.Clone()
-		header.Del("url")
-		header.Del("url_hash")
-		destReq.Header = header
-	}
+func copyRequestHeader(destReq, srcReq *http.Request) {
 	// header
 	destReq.Header.Set("Accept", srcReq.Header.Get("Accept"))
-	destReq.Header.Set("Accept-Encoding", srcReq.Header.Get("Accept-Encoding"))
 	destReq.Header.Set("Accept-Language", srcReq.Header.Get("Accept-Language"))
+	if strings.Contains(srcReq.Header.Get("Accept-Encoding"), "gzip") {
+		// 仅支持 gzip
+		destReq.Header.Set("Accept-Encoding", "gzip")
+	}
 	// 判断请求来源是桌面浏览器还是移动端
 	if strings.Contains(srcReq.UserAgent(), "Mobile") {
 		destReq.Header.Set("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 7_0_4 like Mac OS X) AppleWebKit/537.51.1 (KHTML, like Gecko) CriOS/31.0.1650.18 Mobile/11B554a Safari/8536.25")
@@ -492,10 +511,13 @@ func readBody(writer http.ResponseWriter, response *http.Response) ([]byte, erro
 
 	// gzip解压缩
 	if strings.Contains(response.Header.Get("Content-Encoding"), "gzip") {
-		var err error
-		if b, err = gzip.NewReader(b); err != nil {
+		r, err := gzip.NewReader(b)
+		if err != nil {
 			serveFailedPage(writer, http.StatusForbidden, "访问目标网页失败")
 			return nil, err
+		} else {
+			b = r
+			defer r.Close()
 		}
 	}
 
