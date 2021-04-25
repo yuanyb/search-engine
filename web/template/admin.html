@@ -102,7 +102,7 @@
                             <a class="nav-link" data-toggle="pill" href="#tab_keyword">关键词管理</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" data-toggle="pill" href="#tab_crawler_manage">爬虫管理</a>
+                            <a class="nav-link" data-toggle="pill" href="#tab_crawler_manage" id="refresh_crawler">爬虫管理</a>
                         </li>
                     </ul>
                     <hr>
@@ -161,7 +161,7 @@
                                         <div class="input-group-prepend">
                                             <span class="input-group-text">爬虫暂停开关</span>
                                         </div>
-                                        <button class="btn btn-secondary">关</button>
+                                        <button class="btn btn-secondary" id="btn_crawler_suspend">关</button>
                                     </div>
                                 </div>
                                 <div class="col-3">
@@ -169,7 +169,7 @@
                                         <div class="input-group-prepend">
                                             <span class="input-group-text">随即间隔开关</span>
                                         </div>
-                                        <button class="btn btn-secondary">关</button>
+                                        <button class="btn btn-secondary" id="btn_random_interval">关</button>
                                     </div>
                                 </div>
                             </div>
@@ -181,7 +181,7 @@
                                         </div>
                                         <input type="text" class="form-control" id="useragent" name="useragent">
                                         <div class="input-group-append">
-                                            <button class="btn btn-primary">修改</button>
+                                            <button class="btn btn-primary" id="btn_useragent">修改</button>
                                         </div>
                                     </div>
                                 </div>
@@ -194,7 +194,7 @@
                                         </div>
                                         <input type="text" class="form-control" id="timeout" name="timeout">
                                         <div class="input-group-append">
-                                            <button class="btn btn-primary">修改</button>
+                                            <button class="btn btn-primary" id="btn_timeout">修改</button>
                                         </div>
                                     </div>
                                 </div>
@@ -207,7 +207,7 @@
                                         </div>
                                         <input type="text" class="form-control" id="interval" name="interval">
                                         <div class="input-group-append">
-                                            <button class="btn btn-primary">修改</button>
+                                            <button class="btn btn-primary" id="btn_interval">修改</button>
                                         </div>
                                     </div>
                                 </div>
@@ -220,7 +220,7 @@
                                         </div>
                                         <input type="text" class="form-control" id="retry_count" name="retry_count">
                                         <div class="input-group-append">
-                                            <button class="btn btn-primary">修改</button>
+                                            <button class="btn btn-primary" id="btn_retry">修改</button>
                                         </div>
                                     </div>
                                 </div>
@@ -232,10 +232,5 @@
         </div>
     </div>
 </div>
-
-<script>
-
-
-</script>
 </body>
 </html>

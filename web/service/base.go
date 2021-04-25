@@ -208,7 +208,10 @@ func newSession() *session {
 }
 
 func getSession(sessionId string) *session {
-	s, _ := sessionMap.Load(sessionId)
+	s, ok := sessionMap.Load(sessionId)
+	if !ok {
+		return nil
+	}
 	s2 := s.(*session)
 	s2.lastAccessTime = time.Now().Unix()
 	return s2

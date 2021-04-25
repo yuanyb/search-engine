@@ -196,34 +196,77 @@ $(function () {
     })
 
     ///////////////////爬虫管理////////////////////
-    $("").click(function () {
-        $.get("/admin/get_illegal_keyword", function (data, status) {
-
+    let btnCrawlerSuspend = $("#btn_crawler_suspend")
+    let btnRandomInterval = $("#btn_random_interval")
+    $("#refresh_crawler").click(function (){
+        $.get("/admin/get_crawler_config", function (data, status) {
+            if (status !== "success") {
+                alert("获取配置失败")
+                return
+            }
+            let json = JSON.parse(data)
+            if (json.code !== 0) {
+                alert("获取配置失败")
+                return
+            }
+            $("#interval").val(json.data.interval)
+            $("#timeout").val(json.data.timeout)
+            $("#useragent").val(json.data.useragent)
+            $("#retry_count").val(json.data.retry_count)
+            if (json.data.suspend === "true") {
+                btnCrawlerSuspend.text("开").attr("class", "btn btn-primary")
+            } else {
+                btnCrawlerSuspend.text("关").attr("class", "btn btn-secondary")
+            }
+            if (json.data.random_interval === "true") {
+                btnRandomInterval.text("开").attr("class", "btn btn-primary")
+            } else {
+                btnRandomInterval.text("关").attr("class", "btn btn-secondary")
+            }
         })
     })
-    $("").click(function () {
-        $.get("/admin/get_illegal_keyword", function (data, status) {
-
+    function manageCrawler(name, value, action) {
+        $.get("/admin/update_crawler_config", {name:name, value:value}, function (data, status) {
+            if (status !== "success" || JSON.parse(data).code !== 0) {
+                alert("操作失败")
+                return
+            }
+            alert("操作成功")
+            action()
         })
+    }
+    btnCrawlerSuspend.click(function () {
+        if (btnCrawlerSuspend.text() === "开") {
+            manageCrawler("suspend", "false", function () {
+                btnCrawlerSuspend.text("关").attr("class", "btn btn-secondary")
+            })
+        } else {
+            manageCrawler("suspend", "true", function () {
+                btnCrawlerSuspend.text("开").attr("class", "btn btn-primary")
+            })
+        }
     })
-    $("").click(function () {
-        $.get("/admin/get_illegal_keyword", function (data, status) {
-
-        })
+    btnRandomInterval.click(function () {
+        if (btnRandomInterval.text() === "开") {
+            manageCrawler("random_interval", "false", function () {
+                btnRandomInterval.text("关").attr("class", "btn btn-secondary")
+            })
+        } else {
+            manageCrawler("random_interval", "true", function () {
+                btnRandomInterval.text("开").attr("class", "btn btn-primary")
+            })
+        }
     })
-    $("").click(function () {
-        $.get("/admin/get_illegal_keyword", function (data, status) {
-
-        })
+    $("#btn_interval").click(function () {
+        manageCrawler("interval", $("#interval").val())
     })
-    $("").click(function () {
-        $.get("/admin/get_illegal_keyword", function (data, status) {
-
-        })
+    $("#btn_retry").click(function () {
+        manageCrawler("retry_count", $("#retry_count").val())
     })
-    $("").click(function () {
-        $.get("/admin/get_illegal_keyword", function (data, status) {
-
-        })
+    $("#btn_useragent").click(function () {
+        manageCrawler("useragent", $("#useragent").val())
+    })
+    $("#btn_timeout").click(function () {
+        manageCrawler("timeout", $("#timeout").val())
     })
 })

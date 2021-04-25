@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/bitly/go-simplejson"
@@ -281,7 +282,7 @@ func IncludeDomainHandler(writer http.ResponseWriter, request *http.Request) {
 
 const salt = "QUT-SeArCh"
 
-func LoginHandler(writer http.ResponseWriter, request *http.Request) {
+func AdminLoginHandler(writer http.ResponseWriter, request *http.Request) {
 	username := strings.TrimSpace(request.FormValue("username"))
 	password := strings.TrimSpace(request.FormValue("password"))
 	if username == "" || password == "" {
@@ -292,7 +293,7 @@ func LoginHandler(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	sum := sha256.Sum256([]byte(password + salt))
-	password = string(sum[:])
+	password = hex.EncodeToString(sum[:])
 	if ok, err := db.Mysql.Login(username, password); err != nil || !ok {
 		writeJson(writer, http.StatusOK, &response{
 			Code: codeFail,
@@ -305,10 +306,7 @@ func LoginHandler(writer http.ResponseWriter, request *http.Request) {
 		Name:  "sessionID",
 		Value: sess.sessionId,
 	})
-	writeJson(writer, http.StatusOK, &response{
-		Code: codeSuccess,
-		Data: map[string]string{"redirect": "/admin"},
-	})
+	tmpl.Lookup("admin.html").Execute(writer, nil)
 }
 
 func writeJson(writer http.ResponseWriter, statusCode int, response *response) {
@@ -318,14 +316,19 @@ func writeJson(writer http.ResponseWriter, statusCode int, response *response) {
 }
 
 func checkLogin(request *http.Request) bool {
-	return true
-	_, err := request.Cookie("sessionID")
-	if err != nil {
+	sessionID, err := request.Cookie("sessionID")
+	if err != nil || (sessionID != nil && getSession(sessionID.Value) == nil) {
 		return false
 	}
 	return true
 }
 
 func AdminHandler(writer http.ResponseWriter, request *http.Request) {
+	// 判断来源 ip，只允许内网访问
+
+	if !checkLogin(request) {
+		tmpl.Lookup("admin-login.html").Execute(writer, nil)
+		return
+	}
 	tmpl.Lookup("admin.html").Execute(writer, nil)
 }

@@ -13,11 +13,14 @@ func main() {
 	// admin
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./template/static/")))) // admin.js
 	http.HandleFunc("/admin", service.AdminHandler)
+	http.HandleFunc("/admin/login", service.AdminLoginHandler)
 	http.HandleFunc("/admin/monitor", service.MonitorHandler)
 	http.HandleFunc("/admin/include_domain", service.IncludeDomainHandler)
 	http.HandleFunc("/admin/manage_illegal_keyword", service.ManageIllegalKeywordHandler)
 	http.HandleFunc("/admin/manage_domain_blacklist", service.ManageDomainBlacklistHandler)
 	http.HandleFunc("/admin/get_illegal_keyword", service.GetIllegalKeywordHandler)
 	http.HandleFunc("/admin/get_domain_blacklist", service.GetDomainBlacklistHandler)
+	http.HandleFunc("/admin/get_crawler_config", service.GetCrawlerConfigHandler)
+	http.HandleFunc("/admin/update_crawler_config", service.UpdateCrawlerConfigHandler)
 	_ = http.ListenAndServe(config.Get("web.listenAddr"), nil)
 }
