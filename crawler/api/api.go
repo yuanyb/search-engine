@@ -35,9 +35,9 @@ const (
 	codeFail
 )
 
-var engine *core.CrawlerEngine
+var engine *core.Engine
 
-func Serve(e *core.CrawlerEngine) {
+func Serve(e *core.Engine) {
 	engine = e
 	http.HandleFunc("/monitor", monitor)
 	http.HandleFunc("/seedurl", addSeedUrl)

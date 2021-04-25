@@ -6,7 +6,7 @@ import (
 )
 
 var CenterRedis = NewRedis()
-var CacheRedis = CenterRedis
+var CacheRedis = CenterRedis // todo 缓存应该使用一个单独的 redis
 
 func NewRedis() *redis.Client {
 	rdb := redis.NewClient(&redis.Options{

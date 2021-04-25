@@ -29,25 +29,43 @@ func registerSelf() {
 }
 
 func main() {
+	// 退出时移除自己
 	defer func() {
-		// 退出时移除自己
 		db.Redis.HDel(context.Background(), "crawler.addr", config.GetLocal("crawler.listenAddr"))
 	}()
+	// 初始化定时任务
+	core.InitCron()
+
+	// 获取配置
 	goroutineCount, err := strconv.Atoi(config.GetLocal("crawler.goroutineCount"))
 	if err != nil {
 		panic("goroutineCount format error")
 	}
 
-	core.InitCron()
+	var scheduler core.Scheduler
+	var bloomfilter core.BloomFilter
+	switch config.GetLocal("crawler.scheduler") {
+	case "single":
+		scheduler = core.NewBFScheduler()
+		bloomfilter = core.NewLocalBloomFilter(1000_0000)
+	case "distributed":
+		scheduler = core.NewDistributedScheduler()
+		bloomfilter = core.NewDistBloomFilter(1000_0000)
+	default:
+		panic("unknown scheduler")
+	}
+
 	engine := core.NewCrawlerEngine(
-		core.NewBFScheduler(),
+		scheduler,
 		core.GlobalDl,
+		bloomfilter,
 		goroutineCount,
 		strings.Split(config.GetLocal("crawler.seedUrls"), ","),
 	)
 	engine.Run()
 
 	registerSelf()
+
 	api.Serve(engine)
 	_ = http.ListenAndServe(config.GetLocal("crawler.listenAddr"), nil)
 }

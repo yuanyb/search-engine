@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewBloomFilter(t *testing.T) {
-	bf := NewBloomFilter(4)
+	bf := NewLocalBloomFilter(4)
 	bf.Add("http://baidu.com/")
 	fmt.Println(bf.Has("http://baidu.com/"))
 	bf.Add("http://google.com/")

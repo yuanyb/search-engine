@@ -21,7 +21,7 @@ var (
 	// 本地配置项必须提供
 	localConfigItem = [...]string{"mysql.username", "mysql.password", "mysql.host",
 		"mysql.port", "mysql.dbname", "redis.addr", "indexer.addr", "crawler.goroutineCount",
-		"crawler.seedUrls", "crawler.listenAddr"}
+		"crawler.seedUrls", "crawler.listenAddr", "crawler.scheduler"}
 
 	localConfig   = loadLocalConfig()
 	defaultConfig = CrawlerConfig{
@@ -31,7 +31,6 @@ var (
 		Timeout:        10000,
 		RetryCount:     3,
 		Useragent:      "qut_spider",
-		LogLevel:       util.LDebug,
 	}
 )
 
@@ -67,8 +66,6 @@ func (c *CrawlerConfig) fill(name, value string) {
 		util.ToInt(&c.RetryCount, value)
 	case "useragent": // string
 		c.Useragent = value
-	case "log_level": // string
-		util.ToInt(&c.LogLevel, value)
 	}
 }
 
@@ -95,8 +92,6 @@ func init() {
 		initialized := false
 		for {
 			latestConfig := loadLatestConfig()
-			// 更新日志级别
-			util.Logger.SetLevel(latestConfig.LogLevel)
 			dynamicConfig.Store(latestConfig)
 			if !initialized {
 				initialized = true

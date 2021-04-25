@@ -16,11 +16,13 @@ import (
 )
 
 // 网页文档的下载、处理、存储由多个 goroutine 执行
-type CrawlerEngine struct {
+type Engine struct {
 	// 下载完某个网页文档后解析到的 urlGroup，engine 将其交给 URL 调度器
-	urlGroupChan chan UrlGroup
+	urlGroupChan chan urlGroup
 	// 下载器
 	downloader Downloader
+	// 布隆过滤器
+	bloomFilter BloomFilter
 	// 传给下载器的 URL，channel 的缓冲区要很长
 	urlChan []chan string
 	// 调度策略
@@ -37,10 +39,10 @@ type CrawlerEngine struct {
 	FailureCount int32
 }
 
-// UrlGroup 表示一个 URL 组，Leader 这个 URL 对应页面文档中的所有链接就是 Members
-type UrlGroup struct {
-	Leader  string
-	Members []string
+// urlGroup 表示一个 URL 组，leader 这个 URL 对应页面文档中的所有链接就是 members
+type urlGroup struct {
+	leader  string
+	members []string
 }
 
 var indexerAddrList atomic.Value
@@ -51,7 +53,7 @@ func InitCron() {
 	go func() {
 		initialized := false
 		for {
-			if r, err := db.Redis.HGetAll(context.Background(), "indexer.addr").Result(); err != nil {
+			if r, err := db.Redis.HGetAll(context.Background(), "indexer.addr").Result(); err == nil {
 				addrList := make([]string, 0, len(r))
 				for addr, heartbeatTime := range r {
 					t, _ := strconv.Atoi(heartbeatTime)
@@ -68,13 +70,14 @@ func InitCron() {
 				initialized = true
 				initDone <- struct{}{}
 			}
+			time.Sleep(time.Second * 30)
 		}
 	}()
 	<-initDone
 	close(initDone)
 }
 
-func (e *CrawlerEngine) startCrawlerGoroutine() {
+func (e *Engine) startCrawlerGoroutine() {
 	for i := 0; i < e.goroutineCount; i++ {
 		go func(num int) {
 			defer e.fallback()
@@ -106,7 +109,7 @@ func (e *CrawlerEngine) startCrawlerGoroutine() {
 				urls = e.filterUrl(urls)
 				// 打散 url 列表，使各个 crawler goroutine 更加均衡
 				util.ShuffleStringSlice(urls)
-				e.urlGroupChan <- UrlGroup{Leader: u, Members: urls}
+				e.urlGroupChan <- urlGroup{leader: u, members: urls}
 				e.crawlerWait()
 				info := fmt.Sprintf("crawler-%d ok, url:%s, time:%.1fs", num, u, time.Now().Sub(begin).Seconds())
 				println(info)
@@ -115,10 +118,8 @@ func (e *CrawlerEngine) startCrawlerGoroutine() {
 	}
 }
 
-var bloomFilter = NewBloomFilter(1000000)
-
 // 过滤 URL，如：robots.txt禁止爬的，手动添加的不爬的URL，已经爬过的 URL
-func (e *CrawlerEngine) filterUrl(urls []string) []string {
+func (e *Engine) filterUrl(urls []string) []string {
 	var filterResult []string
 
 	for _, u := range urls {
@@ -126,22 +127,18 @@ func (e *CrawlerEngine) filterUrl(urls []string) []string {
 		if !Allow(u, config.Get().Useragent) {
 			continue
 		}
-
 		// bloomFilter
-		if bloomFilter.Has(u) {
+		if e.bloomFilter.has(u) {
 			continue
 		}
-		bloomFilter.Add(u)
-
-		// 手动添加的黑名单
-
+		e.bloomFilter.add(u)
 		// 允许爬取
 		filterResult = append(filterResult, u)
 	}
 	return filterResult
 }
 
-func (e *CrawlerEngine) crawlerWait() {
+func (e *Engine) crawlerWait() {
 	conf := config.Get()
 	if conf.RandomInterval {
 		time.Sleep(util.Int64ToMillisecond(rand.Int63n(conf.Interval) + 2))
@@ -150,7 +147,7 @@ func (e *CrawlerEngine) crawlerWait() {
 	}
 }
 
-func (e *CrawlerEngine) fallback() {
+func (e *Engine) fallback() {
 	if v := recover(); v != nil {
 		panic(v)
 		// 报警，备份数据
@@ -166,7 +163,7 @@ func (e *CrawlerEngine) fallback() {
 // 同一个协程中，这样才能解决此问题，使用哈希即可。为了保险
 // 起见，不能哈希域名，因为小网站的多个二级域名可能都对应
 // 同一个 ip，所以哈希域名对应的ip。
-func (e *CrawlerEngine) startSchedulerGoroutine() {
+func (e *Engine) startSchedulerGoroutine() {
 	go func() {
 		defer e.fallback()
 		e.scheduler.AddSeedUrls(e.seedUrls)
@@ -175,7 +172,7 @@ func (e *CrawlerEngine) startSchedulerGoroutine() {
 			urlChanFull := false
 			for !urlChanFull {
 				if e.scheduler.Empty() {
-					time.Sleep(util.Int64ToMillisecond(config.Get().Timeout * 2))
+					time.Sleep(util.Int64ToMillisecond(config.Get().Interval + config.Get().Timeout))
 					break
 				}
 				u := e.scheduler.Front()
@@ -183,7 +180,7 @@ func (e *CrawlerEngine) startSchedulerGoroutine() {
 				select {
 				case e.urlChan[to] <- u:
 					e.scheduler.Poll()
-				case <-time.After(util.Int64ToMillisecond(config.Get().Timeout * 2)):
+				case <-time.After(util.Int64ToMillisecond(config.Get().Interval + config.Get().Timeout)):
 					urlChanFull = true
 				}
 			}
@@ -206,7 +203,7 @@ var ipHashMap = make(map[string]int, 10000)
 
 // 获取 host 对应 ip 的 hash，作用是将属于同一个 ip 的 url
 // 全交给同一个协程爬取
-func (e *CrawlerEngine) getHostIpHash(rawUrl string) int {
+func (e *Engine) getHostIpHash(rawUrl string) int {
 	parsedUrl, err := url.Parse(rawUrl)
 	if err != nil {
 		return rand.Intn(e.goroutineCount)
@@ -234,12 +231,12 @@ func (e *CrawlerEngine) getHostIpHash(rawUrl string) int {
 }
 
 // 运行爬虫
-func (e *CrawlerEngine) Run() {
+func (e *Engine) Run() {
 	e.startSchedulerGoroutine()
 	e.startCrawlerGoroutine()
 }
 
-func NewCrawlerEngine(sch Scheduler, dl Downloader, goCount int, seedUrls []string) *CrawlerEngine {
+func NewCrawlerEngine(sch Scheduler, dl Downloader, bf BloomFilter, goCount int, seedUrls []string) *Engine {
 	var chanList = make([]chan string, goCount)
 	for i := 0; i < goCount; i++ {
 		// 大容量的 buffered channel 是为了能让 crawler goroutine 都能有事干，
@@ -247,14 +244,15 @@ func NewCrawlerEngine(sch Scheduler, dl Downloader, goCount int, seedUrls []stri
 		// 造成其他网站的 url 得不到爬取，很多协程都处于空闲状态
 		chanList[i] = make(chan string, 10000)
 	}
-	engine := &CrawlerEngine{
+	engine := &Engine{
 		scheduler:      sch,
 		downloader:     dl,
+		bloomFilter:    bf,
 		goroutineCount: goCount,
 		seedUrls:       seedUrls,
 		SeedUrlChan:    make(chan string),
 		urlChan:        chanList,
-		urlGroupChan:   make(chan UrlGroup, goCount*100),
+		urlGroupChan:   make(chan urlGroup, goCount*100),
 		Birthday:       time.Now().Unix(),
 	}
 	return engine
