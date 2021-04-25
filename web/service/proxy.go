@@ -432,8 +432,8 @@ func sanitizeAttrs(writer io.Writer, baseURL *url.URL, attrs [][][]byte) {
 				fmt.Fprintf(writer, ` %s="%s" `, attr[0], proxyURL)
 			}
 		case "action":
-			// 因为已经向 form 标签注入过 url、key 参数了，所以 action 为 "/" 就行
-			writer.Write([]byte(` action="/" `))
+			// 因为已经向 form 标签注入过 url、key 参数了，所以 action 为 "/proxy" 就行
+			writer.Write([]byte(` action="/proxy" `))
 		case "style":
 			styleValueBuffer := new(bytes.Buffer)
 			sanitizeCSS(styleValueBuffer, baseURL, attr[1])

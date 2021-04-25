@@ -50,6 +50,7 @@ func NewMysqlDB(options *MysqlDBOptions) *MysqlDB {
 	checkDBInitError(err)
 	err = db.Ping()
 	checkDBInitError(err)
+	mysqlDB.db = db
 
 	mysqlDB.getIllegalKeywords, err = db.Prepare("select `keyword` from `illegal_keyword`")
 	checkDBInitError(err)
@@ -57,7 +58,7 @@ func NewMysqlDB(options *MysqlDBOptions) *MysqlDB {
 	mysqlDB.delIllegalKeyword, err = db.Prepare("delete from `illegal_keyword` where `keyword` = ?")
 	checkDBInitError(err)
 
-	mysqlDB.getDomainBlackList, err = db.Prepare("select * from `domain_blacklist`")
+	mysqlDB.getDomainBlackList, err = db.Prepare("select `domain` from `domain_blacklist`")
 	checkDBInitError(err)
 
 	mysqlDB.delDomain, err = db.Prepare("delete from `domain_blacklist` where `domain` = ?")
@@ -96,12 +97,12 @@ func (db *MysqlDB) GetIllegalKeyWords() ([]string, error) {
 
 func (db *MysqlDB) AddIllegalKeywords(keywords []string) error {
 	sqlBuf := new(strings.Builder)
-	sqlBuf.WriteString("insert into `illegal_keyword`(keyword) values")
+	sqlBuf.WriteString("insert into `illegal_keyword`(`keyword`) values")
 	for i, kw := range keywords {
 		if i < len(keywords)-1 {
-			sqlBuf.WriteString(fmt.Sprintf("(%s),", kw))
+			sqlBuf.WriteString(fmt.Sprintf("('%s'),", kw))
 		} else {
-			sqlBuf.WriteString(fmt.Sprintf("(%s);", kw))
+			sqlBuf.WriteString(fmt.Sprintf("('%s');", kw))
 		}
 	}
 	_, err := db.db.Exec(sqlBuf.String())
@@ -135,9 +136,9 @@ func (db *MysqlDB) AddDomainBlacklist(domainList []string) error {
 	sqlBuf.WriteString("insert into `domain_blacklist`(domain) values")
 	for i, domain := range domainList {
 		if i < len(domainList)-1 {
-			sqlBuf.WriteString(fmt.Sprintf("(%s),", domain))
+			sqlBuf.WriteString(fmt.Sprintf("('%s'),", domain))
 		} else {
-			sqlBuf.WriteString(fmt.Sprintf("(%s);", domain))
+			sqlBuf.WriteString(fmt.Sprintf("('%s');", domain))
 		}
 	}
 	_, err := db.db.Exec(sqlBuf.String())

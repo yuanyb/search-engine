@@ -7,9 +7,17 @@ import (
 )
 
 func main() {
-	// todo 匿名访问链接有问题
-	http.HandleFunc("/", service.Index)
-	http.HandleFunc("/search", service.Search)
+	http.HandleFunc("/", service.IndexHandler)
+	http.HandleFunc("/search", service.SearchHandler)
 	http.HandleFunc("/proxy", service.ProxyHandler)
+	// admin
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./template/static/")))) // admin.js
+	http.HandleFunc("/admin", service.AdminHandler)
+	http.HandleFunc("/admin/monitor", service.MonitorHandler)
+	http.HandleFunc("/admin/include_domain", service.IncludeDomainHandler)
+	http.HandleFunc("/admin/manage_illegal_keyword", service.ManageIllegalKeywordHandler)
+	http.HandleFunc("/admin/manage_domain_blacklist", service.ManageDomainBlacklistHandler)
+	http.HandleFunc("/admin/get_illegal_keyword", service.GetIllegalKeywordHandler)
+	http.HandleFunc("/admin/get_domain_blacklist", service.GetDomainBlacklistHandler)
 	_ = http.ListenAndServe(config.Get("web.listenAddr"), nil)
 }

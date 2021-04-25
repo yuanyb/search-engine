@@ -16,7 +16,7 @@ import (
 type MonitorInfo struct {
 	Addr         string  `json:"addr"`
 	MemTotal     int     `json:"mem_total"`
-	MemUsed      int     `json:"mem_used"`
+	MemPercent   float64 `json:"mem_percent"`
 	CpuPercent   float64 `json:"cpu_percent"`
 	RunningTime  int     `json:"running_time"`
 	CrawledCount int     `json:"crawled_count"`
@@ -45,11 +45,11 @@ func Serve(e *core.CrawlerEngine) {
 
 func monitor(response http.ResponseWriter, request *http.Request) {
 	info := new(MonitorInfo)
-	info.Addr = config.GetLocal("crawler.addr")
+	info.Addr = config.GetLocal("crawler.listenAddr")
 	// 获取操作系统信息
 	if m, err := mem.VirtualMemory(); err == nil {
 		info.MemTotal = int(m.Total)
-		info.MemUsed = int(m.Used)
+		info.MemPercent = float64(m.Used) / float64(m.Total)
 	}
 	if c, err := cpu.Percent(time.Millisecond*500, false); err == nil {
 		info.CpuPercent = c[0]

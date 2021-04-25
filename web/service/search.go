@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/bitly/go-simplejson"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"search-engine/web/db"
@@ -39,6 +40,8 @@ type searchResult struct {
 	Query    string
 	Items    []*searchResultItem
 	Info     string
+	Pn       int // 当前页码
+	MaxPn    int // 最大页码（<= 10）
 	Duration float64
 }
 
@@ -59,17 +62,18 @@ func getFromCache(query string, pn int) (*searchResult, error) {
 	// 因为 lrange 命令无法不存在的 key 返回 redis.Nil，所以要判断一下 key 是否存在
 	pipeline := db.CacheRedis.Pipeline()
 	defer pipeline.Close()
-	p1 := pipeline.Exists(ctx, query)
-	p2 := pipeline.LRange(ctx, query, int64((pn-1)*10), int64((pn-1)*10+9))
+	pExists := pipeline.Exists(ctx, query)
+	pItems := pipeline.LRange(ctx, query, int64((pn-1)*10), int64((pn-1)*10+9))
+	pItemsTotalLen := pipeline.LLen(ctx, query)
 	_, err := pipeline.Exec(ctx)
-	if err != nil || p1.Err() != nil || p2.Err() != nil {
+	if err != nil || pExists.Err() != nil || pItems.Err() != nil || pItemsTotalLen.Err() != nil {
 		return nil, err
-	} else if p1.Val() == 0 {
+	} else if pExists.Val() == 0 {
 		// 从索引服务器中检索
 		return nil, nil
 	}
 
-	for _, itemStr := range p2.Val() {
+	for _, itemStr := range pItems.Val() {
 		item := new(searchResultItem)
 		err = json.Unmarshal([]byte(itemStr), item)
 		if err != nil {
@@ -78,6 +82,9 @@ func getFromCache(query string, pn int) (*searchResult, error) {
 		item.AnonymousUrl, _ = convertToProxyURL(baseURL, item.AnonymousUrl)
 		result.Items = append(result.Items, item)
 	}
+	result.Query = query
+	result.Pn = pn
+	result.MaxPn = int(math.Ceil(float64(pItemsTotalLen.Val()) / 10))
 	return result, nil
 }
 
@@ -101,7 +108,7 @@ func addToCache(query string, items []*searchResultItem) {
 }
 
 // 从索引服务器中检索
-func getFromIndexServer(query string) *searchResult {
+func getFromIndexServer(query string) []*searchResultItem {
 	addrList := indexerAddrList.Load().([]string)
 	resultList := requestServerList(addrList, func(channel chan<- interface{}, addr string) {
 		resp, err := http.Get(fmt.Sprintf("http://%s/search?query=%s", addr, query))
@@ -136,14 +143,14 @@ func getFromIndexServer(query string) *searchResult {
 		channel <- items
 	})
 
-	searchResult := new(searchResult)
+	retItems := make([]*searchResultItem, 0, 100)
 	for _, items := range resultList {
-		searchResult.Items = append(searchResult.Items, items.([]*searchResultItem)...)
+		retItems = append(retItems, items.([]*searchResultItem)...)
 	}
-	return searchResult
+	return retItems
 }
 
-func Search(writer http.ResponseWriter, request *http.Request) {
+func SearchHandler(writer http.ResponseWriter, request *http.Request) {
 	begin := time.Now()
 	// 解析参数
 	pn := 1
@@ -175,29 +182,36 @@ func Search(writer http.ResponseWriter, request *http.Request) {
 		log.Println("从缓存获取结果时错误", err)
 	} else if r != nil {
 		r.Duration = time.Now().Sub(begin).Seconds()
-		r.Query = query
 		servePage(writer, "search-result.gohtml", http.StatusOK, r)
 		return
 	}
 
 	// 访问索引服务器检索
-	result := getFromIndexServer(query)
-	sort.Slice(result.Items, func(i, j int) bool { // 按 score 降序排序
-		return result.Items[i].Score > result.Items[j].Score
+	items := getFromIndexServer(query)
+	// 按 score 降序排序
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].Score > items[j].Score
 	})
-	result.Items = result.Items[(pn-1)*10 : util.MinInt((pn-1)*10+10, len(result.Items))]
-
 	// 异步添加到缓存
-	go addToCache(query, result.Items)
+	go addToCache(query, items)
 
+	result := &searchResult{
+		Items: items[(pn-1)*10 : util.MinInt((pn-1)*10+10, len(items))],
+		Query: query,
+		Pn:    pn,
+		MaxPn: int(math.Ceil(float64(len(items)) / 10)),
+	}
 	for _, item := range result.Items {
 		item.AnonymousUrl, _ = convertToProxyURL(baseURL, item.Url)
 	}
 	result.Duration = time.Now().Sub(begin).Seconds()
-	result.Query = query
 	servePage(writer, "search-result.gohtml", http.StatusOK, result)
 }
 
-func Index(writer http.ResponseWriter, request *http.Request) {
+func IndexHandler(writer http.ResponseWriter, request *http.Request) {
+	if request.RequestURI != "/" {
+		writer.WriteHeader(http.StatusNotFound)
+		return
+	}
 	tmpl.Lookup("index.html").Execute(writer, nil)
 }

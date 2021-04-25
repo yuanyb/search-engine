@@ -8,22 +8,234 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.4.1/font/bootstrap-icons.css">
     <script src="https://cdn.staticfile.org/popper.js/1.15.0/umd/popper.min.js"></script>
     <script src="https://cdn.staticfile.org/twitter-bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <script src="/static/admin.js"></script>
     <style>
         /*去掉bootstrap自带的input输入框半透明阴影*/
         .form-control:focus {
             box-shadow: none;
         }
-        /*去除下拉菜单按钮的箭头*/
-        .dropdown-toggle::after {
-            display: none;
+
+        .nav-link {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .nav-link.active {
+            background: #666 !important;
         }
     </style>
 </head>
 <body style="background-color: #F7F7F7">
 <div class="container">
-    <div class="fixed-bottom">
-        <p class="text-center" style="color: darkgrey">© 2021 QUT Search www.qutsearch.com</p>
+    <div class="row">
+        <div class="col-12 text-center" style="color: #666; margin: 10px 0 10px 0">
+            <h2>QUT Search 后台管理</h2>
+            <hr/>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-2">
+            <!-- Nav pills -->
+            <ul class="nav nav-pills" role="tablist" style=" position: sticky; top:10px;border-right: #999 solid 3px;">
+                <li class="nav-item">
+                    <a class="nav-link active" id="nav_crawler" data-toggle="pill" href="#tab_crawler">爬虫系统</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="nav_indexer" data-toggle="pill" href="#tab_indexer">索引系统</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-toggle="pill" href="#tab_cache">缓存系统</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-toggle="pill" href="#tab_manage">系统管理</a>
+                </li>
+            </ul>
+        </div>
+
+        <div class="col-10">
+            <!-- Tab panes -->
+            <div class="tab-content">
+                <div id="tab_crawler" class="container tab-pane active">
+                    <table id="table_crawler" class="table table-striped">
+                        <thead>
+                        <tr>
+                            <th>服务器地址</th>
+                            <th>状态</th>
+                            <th>内存大小</th>
+                            <th>内存使用率</th>
+                            <th>CPU占用</th>
+                            <th>运行时间</th>
+                            <th>已爬取数量</th>
+                            <th>失败数量</th>
+                            <th>失败率</th>
+                        </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div id="tab_indexer" class="container tab-pane fade">
+                    <table id="table_indexer" class="table table-striped">
+                        <thead>
+                        <tr>
+                            <th>服务器地址</th>
+                            <th>状态</th>
+                            <th>内存大小</th>
+                            <th>内存使用率</th>
+                            <th>CPU占用</th>
+                            <th>运行时间</th>
+                            <th>索引大小</th>
+                            <th>索引文档数</th>
+                            <th>词条数量</th>
+                        </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div id="tab_cache" class="container tab-pane fade">
+                </div>
+                <div id="tab_manage" class="container tab-pane fade">
+                    <ul class="nav nav-pills" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-toggle="pill" href="#tab_domain">域名管理</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="pill" href="#tab_keyword">关键词管理</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="pill" href="#tab_crawler_manage">爬虫管理</a>
+                        </li>
+                    </ul>
+                    <hr>
+
+                    <!-- Tab panes -->
+                    <div class="tab-content">
+                        <div id="tab_domain" class="container tab-pane active"><br>
+                            <div class="row">
+                                <div class="col-6">
+                                    <label for="domain">请输入域名（多个域名请使用 "|" 分隔）：</label>
+                                    <textarea class="form-control" style="margin-bottom: 5px" rows="17"
+                                              id="domain"></textarea>
+                                    <button class="btn btn-primary" id="btn_include">收录域名</button>
+                                    <button class="btn btn-primary" id="btn_blacklist">添加域名黑名单</button>
+                                </div>
+                                <div class="col-6" style="height: 500px; overflow: scroll">
+                                    <table id="table_domain_blacklist" class="table table-hover">
+                                        <thead>
+                                        <tr>
+                                            <th id="refresh_domain_blacklist">域名黑名单（单击此处刷新）</th>
+                                            <th>操作</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="tab_keyword" class="container tab-pane fade"><br>
+                            <div class="row">
+                                <div class="col-6">
+                                    <label for="illegal_keyword">添加非法关键词（多个关键词请使用 "|" 分隔）：</label>
+                                    <textarea class="form-control" style="margin-bottom: 5px" rows="17"
+                                              id="illegal_keyword"></textarea>
+                                    <button class="btn btn-primary" id="btn_keyword">添加</button>
+                                </div>
+                                <div class="col-6" style="height: 500px; overflow: scroll">
+                                    <table id="table_illegal_keyword" class="table table-hover">
+                                        <thead>
+                                        <tr>
+                                            <th id="refresh_illegal_keyword">违规关键词（单击此处刷新）</th>
+                                            <th>操作</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="tab_crawler_manage" class="container tab-pane fade"><br>
+                            <div class="row">
+                                <div class="col-3">
+                                    <div class="input-group mb-3">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text">爬虫暂停开关</span>
+                                        </div>
+                                        <button class="btn btn-secondary">关</button>
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <div class="input-group mb-3">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text">随即间隔开关</span>
+                                        </div>
+                                        <button class="btn btn-secondary">关</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="input-group mb-3">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text">User-Agent</span>
+                                        </div>
+                                        <input type="text" class="form-control" id="useragent" name="useragent">
+                                        <div class="input-group-append">
+                                            <button class="btn btn-primary">修改</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="input-group mb-3">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text">超时时间</span>
+                                        </div>
+                                        <input type="text" class="form-control" id="timeout" name="timeout">
+                                        <div class="input-group-append">
+                                            <button class="btn btn-primary">修改</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="input-group mb-3">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text">爬取间隔</span>
+                                        </div>
+                                        <input type="text" class="form-control" id="interval" name="interval">
+                                        <div class="input-group-append">
+                                            <button class="btn btn-primary">修改</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="input-group mb-3">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text">重试次数</span>
+                                        </div>
+                                        <input type="text" class="form-control" id="retry_count" name="retry_count">
+                                        <div class="input-group-append">
+                                            <button class="btn btn-primary">修改</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
+<script>
+
+
+</script>
 </body>
 </html>

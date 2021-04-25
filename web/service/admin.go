@@ -19,28 +19,51 @@ func MonitorHandler(writer http.ResponseWriter, request *http.Request) {
 		writeJson(writer, http.StatusBadRequest, &response{Code: codeFail, Msg: "未登录"})
 		return
 	}
-	result := make(map[string]interface{}, 2)
-	f := func(addrList []string, key string) {
-		result[key] = requestServerList(addrList, func(channel chan<- interface{}, addr string) {
-			resp, err := http.Get(fmt.Sprintf("%s/monitor", addr))
-			if err != nil {
-				log.Println(err)
-				channel <- nil
-				return
-			}
+	_type := strings.TrimSpace(request.FormValue("type"))
+	if _type == "" || (_type != "crawler" && _type != "indexer") {
+		writeJson(writer, http.StatusBadRequest, &response{
+			Code: codeFail,
+			Msg:  "参数错误",
+		})
+		return
+	}
 
-			j, err := simplejson.NewFromReader(resp.Body)
-			if err != nil {
-				log.Println("获取服务器负载失败", err)
-				channel <- nil
-				return
-			}
+	var addrList, deadAddrList []string
+	if _type == "crawler" {
+		addrList = crawlerAddrList.Load().([]string)
+		deadAddrList = deadCrawlerAddrList.Load().([]string)
+	} else {
+		addrList = indexerAddrList.Load().([]string)
+		deadAddrList = deadIndexerAddrList.Load().([]string)
+	}
+	infoList := requestServerList(addrList, func(channel chan<- interface{}, addr string) {
+		resp, err := http.Get(fmt.Sprintf("http://%s/monitor", addr))
+		if err != nil {
+			log.Println(err)
+			channel <- nil
+			return
+		}
 
-			channel <- j
+		j, err := simplejson.NewFromReader(resp.Body)
+		if err != nil || j.Get("code").MustInt() != codeSuccess {
+			log.Println("获取服务器负载失败", err)
+			channel <- nil
+			return
+		}
+		channel <- j.Get("data").MustMap()
+	})
+
+	var result []map[string]interface{}
+	for _, info := range infoList {
+		info2 := info.(map[string]interface{})
+		result = append(result, info2)
+	}
+	for _, dead := range deadAddrList {
+		result = append(result, map[string]interface{}{
+			"addr": dead,
+			"dead": true,
 		})
 	}
-	f(crawlerAddrList.Load().([]string), "crawler_monitor_info_list")
-	f(indexerAddrList.Load().([]string), "indexer_monitor_info_list")
 
 	writeJson(writer, http.StatusOK, &response{
 		Code: codeSuccess,
@@ -57,7 +80,7 @@ func GetCrawlerConfigHandler(writer http.ResponseWriter, request *http.Request) 
 		})
 		return
 	}
-	writeJson(writer, http.StatusBadRequest, &response{
+	writeJson(writer, http.StatusOK, &response{
 		Code: codeSuccess,
 		Data: conf,
 	})
@@ -83,7 +106,7 @@ func UpdateCrawlerConfigHandler(writer http.ResponseWriter, request *http.Reques
 		})
 		return
 	}
-	writeJson(writer, http.StatusBadRequest, &response{Code: codeSuccess})
+	writeJson(writer, http.StatusOK, &response{Code: codeSuccess})
 }
 
 // 获取非法关键词
@@ -99,7 +122,7 @@ func GetIllegalKeywordHandler(writer http.ResponseWriter, request *http.Request)
 			Msg:  "获取失败",
 		})
 	}
-	writeJson(writer, http.StatusInternalServerError, &response{
+	writeJson(writer, http.StatusOK, &response{
 		Code: codeSuccess,
 		Data: keywords,
 	})
@@ -143,7 +166,7 @@ func ManageIllegalKeywordHandler(writer http.ResponseWriter, request *http.Reque
 			return
 		}
 	}
-	writeJson(writer, http.StatusInternalServerError, &response{
+	writeJson(writer, http.StatusOK, &response{
 		Code: codeSuccess,
 	})
 }
@@ -155,8 +178,9 @@ func GetDomainBlacklistHandler(writer http.ResponseWriter, request *http.Request
 			Code: codeFail,
 			Msg:  "获取失败",
 		})
+		return
 	}
-	writeJson(writer, http.StatusInternalServerError, &response{
+	writeJson(writer, http.StatusOK, &response{
 		Code: codeSuccess,
 		Data: blacklist,
 	})
@@ -206,7 +230,7 @@ func ManageDomainBlacklistHandler(writer http.ResponseWriter, request *http.Requ
 			return
 		}
 	}
-	writeJson(writer, http.StatusInternalServerError, &response{
+	writeJson(writer, http.StatusOK, &response{
 		Code: codeSuccess,
 	})
 
@@ -234,6 +258,10 @@ func IncludeDomainHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	addrList := crawlerAddrList.Load().([]string)
+	if len(addrList) == 0 {
+		writeJson(writer, http.StatusOK, &response{Code: codeFail, Msg: "操作失败，无爬虫在运行"})
+		return
+	}
 	addr := addrList[rand.Intn(len(addrList))]
 	b, _ := json.Marshal(map[string]interface{}{
 		"seed_urls": domainList,
@@ -248,7 +276,7 @@ func IncludeDomainHandler(writer http.ResponseWriter, request *http.Request) {
 		writeJson(writer, http.StatusInternalServerError, &response{Code: codeFail, Msg: "收录失败"})
 		return
 	}
-	writeJson(writer, http.StatusInternalServerError, &response{Code: codeSuccess})
+	writeJson(writer, http.StatusOK, &response{Code: codeSuccess})
 }
 
 const salt = "QUT-SeArCh"
@@ -290,9 +318,14 @@ func writeJson(writer http.ResponseWriter, statusCode int, response *response) {
 }
 
 func checkLogin(request *http.Request) bool {
+	return true
 	_, err := request.Cookie("sessionID")
 	if err != nil {
 		return false
 	}
 	return true
+}
+
+func AdminHandler(writer http.ResponseWriter, request *http.Request) {
+	tmpl.Lookup("admin.html").Execute(writer, nil)
 }

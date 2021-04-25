@@ -23,13 +23,16 @@ type response struct {
 func init() {
 	initCron()
 	initTemplate()
+	initSessionCleaner()
 }
 
 var (
-	illegalKeywords []string
-	indexerAddrList atomic.Value
-	crawlerAddrList atomic.Value
-	tmpl            *template.Template
+	illegalKeywords     []string
+	indexerAddrList     atomic.Value
+	deadIndexerAddrList atomic.Value
+	crawlerAddrList     atomic.Value
+	deadCrawlerAddrList atomic.Value
+	tmpl                *template.Template
 )
 
 // 定时任务协程
@@ -62,28 +65,36 @@ func initCron() {
 			// 索引服务器地址
 			if r, err := db.CenterRedis.HGetAll(ctx, "indexer.addr").Result(); err == nil {
 				addrList := make([]string, 0, len(r))
+				deadAddrList := make([]string, 0)
 				for addr, heartbeatTime := range r {
 					t, _ := strconv.Atoi(heartbeatTime)
 					// 40秒内认为存活
 					if time.Now().Unix()-int64(t) < 40 {
 						addrList = append(addrList, addr)
+					} else {
+						deadAddrList = append(deadAddrList, addr)
 					}
 				}
 				indexerAddrList.Store(addrList)
+				deadIndexerAddrList.Store(deadAddrList)
 			} else {
 				log.Println("获取索引服务器地址失败：" + err.Error())
 			}
 			// 爬虫服务器地址
 			if r, err := db.CenterRedis.HGetAll(ctx, "crawler.addr").Result(); err == nil {
 				addrList := make([]string, 0, len(r))
+				deadAddrList := make([]string, 0)
 				for addr, heartbeatTime := range r {
 					t, _ := strconv.Atoi(heartbeatTime)
 					// 40秒内认为存活
 					if time.Now().Unix()-int64(t) < 40 {
 						addrList = append(addrList, addr)
+					} else {
+						deadAddrList = append(deadAddrList, addr)
 					}
 				}
 				crawlerAddrList.Store(addrList)
+				deadCrawlerAddrList.Store(deadAddrList)
 			} else {
 				log.Println("获取爬虫服务器地址失败：" + err.Error())
 			}
@@ -98,12 +109,24 @@ func initCron() {
 }
 
 func initTemplate() {
-	unescapeHTML := func(str string) interface{} {
+	unescapeHTML := func(str string) template.HTML {
 		return template.HTML(str)
+	}
+	maxPnToSlice := func(maxPn int) []int {
+		s := make([]int, maxPn)
+		for i := range s {
+			s[i] = i + 1
+		}
+		return s
+	}
+	add := func(i, delta int) int {
+		return i + delta
 	}
 	tmpl = template.New("tmpl")
 	tmpl.Funcs(template.FuncMap{
 		"unescapeHTML": unescapeHTML,
+		"maxPnToSlice": maxPnToSlice,
+		"add":          add,
 	})
 	t, err := tmpl.ParseGlob("./template/*html")
 	if err != nil {
@@ -155,7 +178,7 @@ type session struct {
 
 var sessionMap = sync.Map{}
 
-func init() {
+func initSessionCleaner() {
 	go func() {
 		for {
 			sessionMap.Range(func(key, value interface{}) bool {

@@ -30,23 +30,19 @@ type Response struct {
 }
 
 type MonitorInfo struct {
-	Addr                        string  `json:"addr"`
-	MemTotal                    int     `json:"mem_total"`
-	MemUsed                     int     `json:"mem_used"`
-	CpuPercent                  float64 `json:"cpu_percent"`
-	RunningTime                 int     `json:"running_time"`
-	IndexFileSize               int     `json:"index_size"`
-	IndexedDocCount             int     `json:"indexed_doc_count"`
-	TokenCount                  int     `json:"token_count"`
-	PostingsBufferHitRate       float64 `json:"postings_buffer_hit_rate"`
-	TokenDocsCountBufferHitRate float64 `json:"token_docs_count_buffer_hit_rate"`
-	DocUrlBufferHitRate         float64 `json:"doc_url_buffer_hit_rate"`
+	Addr            string  `json:"addr"`
+	MemTotal        int     `json:"mem_total"`
+	MemPercent      float64 `json:"mem_percent"`
+	CpuPercent      float64 `json:"cpu_percent"`
+	RunningTime     int     `json:"running_time"`
+	IndexFileSize   int     `json:"index_size"`
+	IndexedDocCount int     `json:"indexed_doc_count"`
+	TokenCount      int     `json:"token_count"`
 }
 
 func Serve(listenAddr string) {
 	engine = core.NewEngine()
 	http.HandleFunc("/search", searchHandler)
-	// 该接口不应该暴露出去，为了方便忽略了
 	http.HandleFunc("/index", indexHandler)
 	http.HandleFunc("/monitor", monitor)
 	err := http.ListenAndServe(listenAddr, nil)
@@ -96,11 +92,11 @@ func indexHandler(writer http.ResponseWriter, request *http.Request) {
 
 func monitor(writer http.ResponseWriter, request *http.Request) {
 	info := new(MonitorInfo)
-	info.Addr = config.Get("crawler.addr")
+	info.Addr = config.Get("indexer.listenAddr")
 	// 获取操作系统信息
 	if m, err := mem.VirtualMemory(); err == nil {
 		info.MemTotal = int(m.Total)
-		info.MemUsed = int(m.Used)
+		info.MemPercent = float64(m.Used) / float64(m.Total)
 	}
 	if c, err := cpu.Percent(time.Millisecond*500, false); err == nil {
 		info.CpuPercent = c[0]
@@ -113,9 +109,6 @@ func monitor(writer http.ResponseWriter, request *http.Request) {
 	}
 	info.IndexedDocCount = engine.DB.GetDocumentsCount()
 	info.TokenCount = engine.DB.GetTokenCount()
-	info.DocUrlBufferHitRate = engine.DB.DocUrlBuffer.GetHitRate()
-	info.PostingsBufferHitRate = engine.DB.PostingsBuffer.GetHitRate()
-	info.TokenDocsCountBufferHitRate = engine.DB.TokenDocsCountBuffer.GetHitRate()
 
 	write(writer, http.StatusOK, &Response{Code: codeSuccess, Data: info})
 }
