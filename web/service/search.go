@@ -111,7 +111,7 @@ func addToCache(query string, items []*searchResultItem) {
 func getFromIndexServer(query string) []*searchResultItem {
 	addrList := indexerAddrList.Load().([]string)
 	resultList := requestServerList(addrList, func(channel chan<- interface{}, addr string) {
-		resp, err := http.Get(fmt.Sprintf("http://%s/search?query=%s", addr, query))
+		resp, err := http.Get(fmt.Sprintf("http://%s/search?query=%s", addr, url.QueryEscape(query)))
 		if err != nil {
 			channel <- nil
 			log.Println(err)
