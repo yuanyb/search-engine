@@ -47,7 +47,6 @@ func trimFragment(url string) string {
 }
 
 func SendDocument(url, document string) {
-	return
 	// 异步发送
 	go func() {
 		j, _ := json.Marshal(map[string]string{
