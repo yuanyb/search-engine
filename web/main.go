@@ -22,5 +22,6 @@ func main() {
 	http.HandleFunc("/admin/get_domain_blacklist", service.GetDomainBlacklistHandler)
 	http.HandleFunc("/admin/get_crawler_config", service.GetCrawlerConfigHandler)
 	http.HandleFunc("/admin/update_crawler_config", service.UpdateCrawlerConfigHandler)
-	_ = http.ListenAndServe(config.Get("web.listenAddr"), nil)
+	//_ = http.ListenAndServe(config.Get("web.listenAddr"), nil)
+	http.ListenAndServeTLS(config.Get("web.ListenAddr"), "./cert.pem", "./private.pem", nil)
 }
