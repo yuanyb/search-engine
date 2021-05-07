@@ -79,7 +79,7 @@ func getFromCache(query string, pn int) (*searchResult, error) {
 		if err != nil {
 			continue
 		}
-		item.AnonymousUrl, _ = convertToProxyURL(baseURL, item.AnonymousUrl)
+		item.AnonymousUrl, _ = convertToProxyURL(baseURL, item.Url)
 		result.Items = append(result.Items, item)
 	}
 	result.Query = query

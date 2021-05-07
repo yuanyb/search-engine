@@ -1,12 +1,14 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"search-engine/web/config"
 	"search-engine/web/service"
 )
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Llongfile)
 	http.HandleFunc("/", service.IndexHandler)
 	http.HandleFunc("/search", service.SearchHandler)
 	http.HandleFunc("/proxy", service.ProxyHandler)

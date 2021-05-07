@@ -29,6 +29,7 @@ func registerSelf() {
 }
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Llongfile)
 	// 退出时移除自己
 	defer func() {
 		db.Redis.HDel(context.Background(), "crawler.addr", config.GetLocal("crawler.listenAddr"))
