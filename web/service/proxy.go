@@ -128,7 +128,11 @@ func process(writer http.ResponseWriter, srcReq *http.Request, rawUrl string, re
 		return
 	}
 
-	req, err := http.NewRequest(srcReq.Method, rawUrl, srcReq.Body)
+	var srcBody io.Reader
+	if srcReq.Method == "POST" {
+		srcBody = srcReq.Body
+	}
+	req, err := http.NewRequest(srcReq.Method, rawUrl, srcBody)
 	if err != nil {
 		serveFailedPage(writer, http.StatusInternalServerError, "内部错误")
 		return
