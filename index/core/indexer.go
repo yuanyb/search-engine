@@ -8,6 +8,7 @@ import (
 	"search-engine/index/config"
 	"search-engine/index/db"
 	"search-engine/index/util"
+	"sync/atomic"
 )
 
 // 索引管理器
@@ -24,6 +25,7 @@ type indexManager struct {
 	indexCount           int           // 当前索引的文档数量
 	db                   *db.IndexDB
 	textProcessor        *textProcessor
+	mergerCount          int32 // 并发检测，确保 merger 只被一个 goroutine 执行
 }
 
 // 倒排索引 token->tokenIndexItem
@@ -237,6 +239,10 @@ func (m *indexManager) indexer() {
 
 // 将 index 合并进索引管理器，只能被单个 goroutine 执行
 func (m *indexManager) merger() {
+	if atomic.CompareAndSwapInt32(&m.mergerCount, 0, 1) {
+		log.Fatalln("merger 只能被一个 goroutine 执行")
+	}
+
 	for index := range m.mergeChannel {
 		if len(m.indexBuffer) == 0 {
 			m.indexBuffer = index
