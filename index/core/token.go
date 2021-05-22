@@ -7,10 +7,10 @@ import "log"
 //var ignoreCharsSet = make(map[rune]struct{})
 //
 //func init() {
-//	ignoreChars := " \f\n\r\t\v!@#$%^&*()_+-=[]{}\\|;:'\",.<>/?`——【】；：‘“、？。《　》，！·"
-//	for _, ch := range ignoreChars {
-//		ignoreCharsSet[ch] = struct{}{}
-//	}
+//    ignoreChars := " \f\n\r\t\v!@#$%^&*()_+-=[]{}\\|;:'\",.<>/?`——【】；：‘“、？。《　》，！·"
+//    for _, ch := range ignoreChars {
+//        ignoreCharsSet[ch] = struct{}{}
+//    }
 //}
 
 // 只为下列字符建立索引

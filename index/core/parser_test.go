@@ -6,15 +6,15 @@ func TestParseDocument(t *testing.T) {
 	document := `
 <!DOCTYPE html>
 <html>
-	<head>
-		<title lang="xxx">==title==
+    <head>
+        <title lang="xxx">==title==
 </title>
-		<style> css </style>
-	</head>
-	<body>
-		<div> text1 <span>text2</span> text3  </div>
-		<script> js code </script>
-	</body>
+        <style> css </style>
+    </head>
+    <body>
+        <div> text1 <span>text2</span> text3  </div>
+        <script> js code </script>
+    </body>
 </html>
 `
 	exceptedTitle := "==title=="

@@ -12,9 +12,9 @@ import (
 )
 
 // 索引管理器
-// indexer 					    		     			flusher
+// indexer                                              flusher
 //   ...   ---mergeChannel--> merger ---flushChannel--> ...
-// indexer											    flusher
+// indexer                                              flusher
 type indexManager struct {
 	indexChannel chan [2]string
 	flushChannel chan invertedIndex

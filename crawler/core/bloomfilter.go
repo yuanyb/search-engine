@@ -61,9 +61,9 @@ func (b *LocalBloomFilter) add(url string) {
 //// 暂时考虑网页的更新策略是清空 bloomFilter
 // todo
 //func (b *LocalBloomFilter) Clear() {
-//	for i := range b.bitmap {
-//		b.bitmap[i] = 0
-//	}
+//    for i := range b.bitmap {
+//        b.bitmap[i] = 0
+//    }
 //}
 //
 //func Load() {
@@ -97,17 +97,17 @@ var (
 	bfHasLuaScript = `
 for i, v in ipairs(ARGV)
 do
-	if (redis.call("getbit", KEYS[1], v) == 0)
-	then
-		return 0
-	end
+    if (redis.call("getbit", KEYS[1], v) == 0)
+    then
+        return 0
+    end
 end
 return 1
 `
 	bfAddLuaScript = `
 for i, v in ipairs(ARGV)
 do
-	redis.call("setbit", KEYS[1], v, 1)
+    redis.call("setbit", KEYS[1], v, 1)
 end
 `
 	bfHasSHA1 string

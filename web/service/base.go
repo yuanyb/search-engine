@@ -38,7 +38,7 @@ var (
 // 定时任务协程
 //     - 更新非法关键词
 //     - 获取最新 indexer 服务器地址
-//	   - 获取最新 crawler 服务器地址
+//       - 获取最新 crawler 服务器地址
 func initCron() {
 	wg := sync.WaitGroup{}
 	wg.Add(2)
