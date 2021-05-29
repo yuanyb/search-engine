@@ -144,6 +144,7 @@ func process(writer http.ResponseWriter, srcReq *http.Request, rawUrl string, re
 		serveFailedPage(writer, http.StatusInternalServerError, "访问目标网页失败")
 		return
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		// 重定向
@@ -493,8 +494,6 @@ func copyRequestHeader(destReq, srcReq *http.Request) {
 
 // 从响应的 Body 中读取字节数据，传入 writer 是为了可以写必要的响应数据（错误、Content-Type）
 func readBody(writer http.ResponseWriter, response *http.Response) ([]byte, error) {
-	defer response.Body.Close()
-
 	contentType := response.Header.Get("Content-Type")
 	if !contentTypeAllow(contentType) {
 		serveFailedPage(writer, http.StatusForbidden, "不支持访问该类型的Web资源")

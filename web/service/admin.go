@@ -44,6 +44,7 @@ func MonitorHandler(writer http.ResponseWriter, request *http.Request) {
 			channel <- nil
 			return
 		}
+		defer resp.Body.Close()
 
 		j, err := simplejson.NewFromReader(resp.Body)
 		if err != nil || j.Get("code").MustInt() != codeSuccess {
@@ -272,6 +273,7 @@ func IncludeDomainHandler(writer http.ResponseWriter, request *http.Request) {
 		writeJson(writer, http.StatusInternalServerError, &response{Code: codeFail, Msg: "收录失败"})
 		return
 	}
+	defer resp.Body.Close()
 	j, err := simplejson.NewFromReader(resp.Body)
 	if err != nil || j.Get("code").MustInt() != codeSuccess {
 		writeJson(writer, http.StatusInternalServerError, &response{Code: codeFail, Msg: "收录失败"})

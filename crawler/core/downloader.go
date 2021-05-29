@@ -96,11 +96,9 @@ func (d *Downloader) getDocType(url string) string {
 	for i := 0; i < retryCount+1; i++ {
 		resp, err := http.DefaultClient.Do(req)
 		if err == nil {
-			if resp.StatusCode == 200 {
-				return resp.Header.Get("Content-Type")
-			} else {
-				_ = resp.Body.Close()
-			}
+			r := resp.Header.Get("Content-Type")
+			_ = resp.Body.Close()
+			return r
 		}
 	}
 	return ""

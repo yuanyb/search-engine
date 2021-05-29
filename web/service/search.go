@@ -117,6 +117,7 @@ func getFromIndexServer(query string) []*searchResultItem {
 			log.Println(err)
 			return
 		}
+		defer resp.Body.Close()
 
 		j, err := simplejson.NewFromReader(resp.Body)
 		if err != nil {
