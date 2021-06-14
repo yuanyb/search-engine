@@ -239,7 +239,7 @@ func (m *indexManager) indexer() {
 
 // 将 index 合并进索引管理器，只能被单个 goroutine 执行
 func (m *indexManager) merger() {
-	if atomic.CompareAndSwapInt32(&m.mergerCount, 0, 1) {
+	if !atomic.CompareAndSwapInt32(&m.mergerCount, 0, 1) {
 		log.Fatalln("merger 只能被一个 goroutine 执行")
 	}
 
