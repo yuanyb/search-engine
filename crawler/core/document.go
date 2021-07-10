@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"regexp"
@@ -55,6 +56,10 @@ func SendDocument(url, document string) {
 		})
 		retryCount := config.Get().RetryCount
 		addrList := indexerAddrList.Load().([]string)
+		if len(addrList) == 0 {
+			log.Println("发送失败，无索引服务器地址")
+			return
+		}
 		indexerAddr := addrList[rand.Intn(len(addrList))]
 		for i := 0; i < retryCount+1; i++ {
 			req, _ := http.NewRequest("PUT", indexerAddr+"/index", bytes.NewReader(j))

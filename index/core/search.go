@@ -403,8 +403,8 @@ func findHighlight(cursors []phraseSearchCursor) [][2]int {
 	return intervals[i : j+1]
 }
 
-func calcBM25() float64 {
-	return 0
+func calcBM25(tokens []*tokenIndexItem, cursors []docSearchCursor, docsCount int) float64 {
+	return calcTfIdf(tokens, cursors, docsCount)
 }
 
 //   TF 词频因子，表示一个单词在文档中出现的次数，一般在某个文档中反复出现的单词，
