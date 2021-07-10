@@ -10,8 +10,8 @@
 https://localhost 首页， https://localhost/admin 后台，
 
 ### 运行截图
-![搜索结果](img/result.png)
-![后台](img/admin.png)
+![搜索结果](result.png)
+![后台](admin.png)
 
 ### 配置文件
 **index - index.properties**
