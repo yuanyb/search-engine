@@ -7,11 +7,13 @@
 - index 实现了倒排索引引擎，参考《自制搜索引擎》一书，加入了并发构建、结果高亮，对项目接口做了调整。
 - web 是网站后端，借助 Redis 实现了简单的分布式节点的注册、发现、访问、和死亡节点的清除机制，同时实现了隐私匿名代理服务（参考了github.com/asciimoo/morty）用保护使用者隐私。
 
-https://localhost 首页， https://localhost/admin 后台，
+![架构图](img/structure.png)
+
+https://localhost 首页， https://localhost/admin 后台。
 
 ### 运行截图
-![搜索结果](result.png)
-![后台](admin.png)
+![搜索结果](img/result.png)
+![后台](img/admin.png)
 
 ### 配置文件
 **index - index.properties**
